@@ -1,0 +1,20 @@
+{
+  "mongodb": {
+    "uri": "mongodb://localhost:27017/",
+    "database": "bd2_experimentos",
+    "collection": "usuarios"
+  },
+  "dataset": {
+    "tamanho_gb": 1.0,
+    "locale": "pt_BR",
+    "batch_size": 1000
+  },
+  "experimentos": {
+    "repeticoes": 10
+  },
+  "graficos": {
+    "output_dir": "resultados",
+    "dpi": 400,
+    "formato": "png"
+  }
+}

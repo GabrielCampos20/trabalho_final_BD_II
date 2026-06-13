@@ -1,0 +1,463 @@
+import json
+import os
+import time
+import random
+from datetime import datetime, timedelta
+
+import numpy as np
+import matplotlib.pyplot as plt
+from pymongo import MongoClient, ASCENDING, TEXT
+from faker import Faker
+from tqdm import tqdm
+
+# -- Configuracao ----------------------------------------------------------------
+
+def carregar_config(caminho="config.json"):
+    with open(caminho, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+CFG = carregar_config()
+
+MONGO_URI  = CFG["mongodb"]["uri"]
+DB_NAME    = CFG["mongodb"]["database"]
+COL_NAME   = CFG["mongodb"]["collection"]
+
+BYTES_POR_DOC = 400
+TAMANHO_GB    = CFG["dataset"]["tamanho_gb"]
+TAMANHO       = int((TAMANHO_GB * 1024 ** 3) / BYTES_POR_DOC)
+LOCALE        = CFG["dataset"]["locale"]
+BATCH_SIZE    = CFG["dataset"]["batch_size"]
+
+REPETICOES = CFG["experimentos"]["repeticoes"]
+
+OUTPUT_DIR = CFG["graficos"]["output_dir"]
+DPI        = CFG["graficos"]["dpi"]
+FORMATO    = CFG["graficos"]["formato"]
+
+fake = Faker(LOCALE)
+
+SAL_MIN     = round(random.uniform(1000.0, 3000.0), 2)
+SAL_MAX     = round(random.uniform(8000.0, 25000.0), 2)
+IDADE_MIN   = random.randint(16, 25)
+IDADE_MAX   = random.randint(50, 80)
+DATA_INICIO = datetime(random.randint(2010, 2016), 1, 1)
+DATA_FIM    = datetime(random.randint(2022, 2024), 12, 31)
+
+PROFISSOES = [
+    "Desenvolvedor", "Analista", "Gerente", "Designer", "Engenheiro",
+    "Professor", "Medico", "Advogado", "Contador", "Enfermeiro",
+    "Arquiteto", "Jornalista", "Psicologo", "Administrador", "Vendedor"
+]
+
+ESTADOS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+    "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+    "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+]
+
+# -- Geracao de dados ------------------------------------------------------------
+
+def gerar_usuario():
+    delta = DATA_FIM - DATA_INICIO
+    criado_em = DATA_INICIO + timedelta(days=random.randint(0, delta.days))
+    ultimo_acesso = criado_em + timedelta(days=random.randint(0, (DATA_FIM - criado_em).days))
+    return {
+        "nome":          fake.name(),
+        "email":         fake.email(),
+        "idade":         random.randint(IDADE_MIN, IDADE_MAX),
+        "cidade":        fake.city(),
+        "estado":        random.choice(ESTADOS),
+        "profissao":     random.choice(PROFISSOES),
+        "salario":       round(random.uniform(SAL_MIN, SAL_MAX), 2),
+        "ativo":         random.choice([True, False]),
+        "criado_em":     criado_em,
+        "ultimo_acesso": ultimo_acesso,
+    }
+
+def popular_banco(col):
+    print(f"\n[Dataset] Alvo: {TAMANHO_GB} GB (~{TAMANHO:,} documentos)")
+    print(f"[Dataset] Ranges desta execucao:")
+    print(f"  Salario:  R$ {SAL_MIN:,.2f} - R$ {SAL_MAX:,.2f}")
+    print(f"  Idade:    {IDADE_MIN} - {IDADE_MAX} anos")
+    print(f"  Datas:    {DATA_INICIO.year} - {DATA_FIM.year}")
+    print(f"\n[Dataset] Inserindo em lotes de {BATCH_SIZE:,}...\n")
+    col.drop()
+    total = 0
+    with tqdm(total=TAMANHO, unit="docs") as barra:
+        while total < TAMANHO:
+            lote = min(BATCH_SIZE, TAMANHO - total)
+            docs = [gerar_usuario() for _ in range(lote)]
+            col.insert_many(docs)
+            total += lote
+            barra.update(lote)
+    print(f"\n[Dataset] {TAMANHO:,} documentos inseridos com sucesso.\n")
+
+# -- Utilitarios -----------------------------------------------------------------
+
+def remover_indices(col):
+    for idx in list(col.index_information().keys()):
+        if idx != "_id_":
+            col.drop_index(idx)
+
+def medir_query(col, filtro, repeticoes=REPETICOES, barra=None):
+    tempos = []
+    for _ in range(repeticoes):
+        inicio = time.perf_counter()
+        list(col.find(filtro))
+        tempos.append((time.perf_counter() - inicio) * 1000)
+        if barra:
+            barra.update(1)
+    return tempos
+
+def explain_query(col, filtro):
+    resultado = col.find(filtro).explain()
+    stats = resultado["executionStats"]
+    return {
+        "stage":               resultado["queryPlanner"]["winningPlan"].get("stage", "N/A"),
+        "executionTimeMillis": stats["executionTimeMillis"],
+        "totalDocsExamined":   stats["totalDocsExamined"],
+        "totalKeysExamined":   stats["totalKeysExamined"],
+    }
+
+def resumo_estatistico(tempos):
+    return {
+        "media":      round(np.mean(tempos), 3),
+        "mediana":    round(np.median(tempos), 3),
+        "desvio_pad": round(np.std(tempos), 3),
+        "minimo":     round(np.min(tempos), 3),
+        "maximo":     round(np.max(tempos), 3),
+    }
+
+def imprimir_resultado(label, tempos, explain, log=print):
+    est = resumo_estatistico(tempos)
+    log(f"  [{label}]")
+    log(f"    Stage:             {explain['stage']}")
+    log(f"    Docs examinados:   {explain['totalDocsExamined']:,}")
+    log(f"    Chaves examinadas: {explain['totalKeysExamined']:,}")
+    log(f"    Tempo medio:       {est['media']} ms")
+    log(f"    Desvio padrao:     {est['desvio_pad']} ms")
+    log(f"    Min / Max:         {est['minimo']} ms / {est['maximo']} ms")
+
+# -- Casos de uso ----------------------------------------------------------------
+
+def caso_1_busca_simples(col, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 1 - Busca simples por campo unico (estado)")
+    log("=" * 60)
+    estado = random.choice(ESTADOS)
+    filtro = {"estado": estado}
+    log(f"  Filtro: estado = {estado}\n")
+    remover_indices(col)
+
+    tempos_sem = medir_query(col, filtro, barra=barra)
+    exp_sem    = explain_query(col, filtro)
+    imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
+
+    col.create_index([("estado", ASCENDING)])
+    tempos_com = medir_query(col, filtro, barra=barra)
+    exp_com    = explain_query(col, filtro)
+    imprimir_resultado("Com indice (single field)", tempos_com, exp_com, log)
+
+    remover_indices(col)
+    return {"sem_indice": tempos_sem, "com_indice": tempos_com,
+            "exp_sem": exp_sem, "exp_com": exp_com}
+
+def caso_2_filtro_composto(col, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 2 - Filtro composto (estado + ativo)")
+    log("=" * 60)
+    estado = random.choice(ESTADOS)
+    ativo  = random.choice([True, False])
+    filtro = {"estado": estado, "ativo": ativo}
+    log(f"  Filtro: estado = {estado}, ativo = {ativo}\n")
+    remover_indices(col)
+
+    tempos_sem = medir_query(col, filtro, barra=barra)
+    exp_sem    = explain_query(col, filtro)
+    imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
+
+    col.create_index([("estado", ASCENDING), ("ativo", ASCENDING)])
+    tempos_com = medir_query(col, filtro, barra=barra)
+    exp_com    = explain_query(col, filtro)
+    imprimir_resultado("Com indice composto", tempos_com, exp_com, log)
+
+    remover_indices(col)
+    return {"sem_indice": tempos_sem, "com_indice": tempos_com,
+            "exp_sem": exp_sem, "exp_com": exp_com}
+
+def caso_3_faixa_numerica(col, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 3 - Busca por faixa numerica (salario)")
+    log("=" * 60)
+    faixa_min = round(random.uniform(SAL_MIN, (SAL_MIN + SAL_MAX) / 2), 2)
+    faixa_max = round(random.uniform((SAL_MIN + SAL_MAX) / 2, SAL_MAX), 2)
+    filtro = {"salario": {"$gte": faixa_min, "$lte": faixa_max}}
+    log(f"  Filtro: salario entre R$ {faixa_min:,.2f} e R$ {faixa_max:,.2f}\n")
+    remover_indices(col)
+
+    tempos_sem = medir_query(col, filtro, barra=barra)
+    exp_sem    = explain_query(col, filtro)
+    imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
+
+    col.create_index([("salario", ASCENDING)])
+    tempos_com = medir_query(col, filtro, barra=barra)
+    exp_com    = explain_query(col, filtro)
+    imprimir_resultado("Com indice (range)", tempos_com, exp_com, log)
+
+    remover_indices(col)
+    return {"sem_indice": tempos_sem, "com_indice": tempos_com,
+            "exp_sem": exp_sem, "exp_com": exp_com}
+
+def caso_4_intervalo_datas(col, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 4 - Busca por intervalo de datas (criado_em)")
+    log("=" * 60)
+    ano = random.randint(DATA_INICIO.year, DATA_FIM.year - 1)
+    filtro = {"criado_em": {"$gte": datetime(ano, 1, 1), "$lte": datetime(ano, 12, 31)}}
+    log(f"  Filtro: criado_em em {ano}\n")
+    remover_indices(col)
+
+    tempos_sem = medir_query(col, filtro, barra=barra)
+    exp_sem    = explain_query(col, filtro)
+    imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
+
+    col.create_index([("criado_em", ASCENDING)])
+    tempos_com = medir_query(col, filtro, barra=barra)
+    exp_com    = explain_query(col, filtro)
+    imprimir_resultado("Com indice (date)", tempos_com, exp_com, log)
+
+    remover_indices(col)
+    return {"sem_indice": tempos_sem, "com_indice": tempos_com,
+            "exp_sem": exp_sem, "exp_com": exp_com}
+
+def caso_5_busca_textual(col, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 5 - Busca textual (profissao)")
+    log("=" * 60)
+    profissao = random.choice(PROFISSOES)
+    log(f"  Filtro: profissao = '{profissao}'\n")
+    remover_indices(col)
+
+    filtro_regex = {"profissao": {"$regex": profissao, "$options": "i"}}
+    tempos_sem   = medir_query(col, filtro_regex, barra=barra)
+    exp_sem      = explain_query(col, filtro_regex)
+    imprimir_resultado("Sem indice (regex)", tempos_sem, exp_sem, log)
+
+    col.create_index([("profissao", TEXT)])
+    filtro_text = {"$text": {"$search": profissao}}
+    tempos_com  = medir_query(col, filtro_text, barra=barra)
+    exp_com     = explain_query(col, filtro_text)
+    imprimir_resultado("Com indice (text)", tempos_com, exp_com, log)
+
+    remover_indices(col)
+    return {"sem_indice": tempos_sem, "com_indice": tempos_com,
+            "exp_sem": exp_sem, "exp_com": exp_com}
+
+# -- Graficos --------------------------------------------------------------------
+
+LABELS_CASOS = [
+    "Caso 1\nCampo unico",
+    "Caso 2\nComposto",
+    "Caso 3\nFaixa numerica",
+    "Caso 4\nDatas",
+    "Caso 5\nTextual",
+]
+
+COR_SEM   = "#E05C5C"
+COR_COM   = "#4C9BE8"
+COR_SPEED = "#5BBF7A"
+
+
+def _salvar(fig, nome):
+    caminho = os.path.join(OUTPUT_DIR, f"{nome}.{FORMATO}")
+    fig.savefig(caminho, dpi=DPI, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  -> {caminho}")
+
+
+def grafico_comparacao_geral(resultados):
+    """Barras agrupadas: tempo medio com vs sem indice para todos os casos."""
+    casos      = list(resultados.keys())
+    medias_sem = [resumo_estatistico(resultados[c]["sem_indice"])["media"] for c in casos]
+    medias_com = [resumo_estatistico(resultados[c]["com_indice"])["media"] for c in casos]
+    erros_sem  = [resumo_estatistico(resultados[c]["sem_indice"])["desvio_pad"] for c in casos]
+    erros_com  = [resumo_estatistico(resultados[c]["com_indice"])["desvio_pad"] for c in casos]
+
+    x, w = np.arange(len(casos)), 0.35
+    fig, ax = plt.subplots(figsize=(12, 6))
+    b1 = ax.bar(x - w/2, medias_sem, w, yerr=erros_sem, label="Sem indice",
+                color=COR_SEM, capsize=5, error_kw={"elinewidth": 1.5})
+    b2 = ax.bar(x + w/2, medias_com, w, yerr=erros_com, label="Com indice",
+                color=COR_COM, capsize=5, error_kw={"elinewidth": 1.5})
+    for b in list(b1) + list(b2):
+        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.3,
+                f"{b.get_height():.1f}", ha="center", va="bottom", fontsize=8)
+    ax.set_xlabel("Caso de Uso", fontsize=12)
+    ax.set_ylabel("Tempo medio (ms)", fontsize=12)
+    ax.set_title("Visao Geral - Tempo Medio por Caso de Uso", fontsize=14)
+    ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
+    ax.legend(fontsize=11); ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    plt.tight_layout()
+    _salvar(fig, "01_comparacao_geral")
+
+
+def graficos_por_caso(resultados):
+    """Um grafico de barras individual para cada caso de uso."""
+    for i, (caso, dados) in enumerate(resultados.items(), 1):
+        est_sem = resumo_estatistico(dados["sem_indice"])
+        est_com = resumo_estatistico(dados["com_indice"])
+        categorias = ["Sem indice", "Com indice"]
+        medias = [est_sem["media"], est_com["media"]]
+        erros  = [est_sem["desvio_pad"], est_com["desvio_pad"]]
+        cores  = [COR_SEM, COR_COM]
+
+        fig, ax = plt.subplots(figsize=(7, 5))
+        bars = ax.bar(categorias, medias, yerr=erros, color=cores,
+                      capsize=6, error_kw={"elinewidth": 1.5}, width=0.4)
+        for b in bars:
+            ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.3,
+                    f"{b.get_height():.2f} ms", ha="center", va="bottom", fontsize=10)
+        titulo = caso.replace("\n", " - ")
+        ax.set_title(f"Tempo Medio - {titulo}", fontsize=13)
+        ax.set_ylabel("Tempo medio (ms)", fontsize=11)
+        ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+        plt.tight_layout()
+        _salvar(fig, f"02_caso_{i}_tempo")
+
+
+def grafico_docs_examinados(resultados):
+    """Barras agrupadas: documentos examinados com vs sem indice."""
+    casos    = list(resultados.keys())
+    docs_sem = [resultados[c]["exp_sem"]["totalDocsExamined"] for c in casos]
+    docs_com = [resultados[c]["exp_com"]["totalDocsExamined"] for c in casos]
+
+    x, w = np.arange(len(casos)), 0.35
+    fig, ax = plt.subplots(figsize=(12, 6))
+    b1 = ax.bar(x - w/2, docs_sem, w, label="Sem indice", color=COR_SEM)
+    b2 = ax.bar(x + w/2, docs_com, w, label="Com indice", color=COR_COM)
+    for b in list(b1) + list(b2):
+        ax.text(b.get_x() + b.get_width()/2, b.get_height() + max(docs_sem) * 0.01,
+                f"{int(b.get_height()):,}", ha="center", va="bottom", fontsize=7, rotation=30)
+    ax.set_xlabel("Caso de Uso", fontsize=12)
+    ax.set_ylabel("Documentos Examinados", fontsize=12)
+    ax.set_title("Documentos Examinados pelo MongoDB - Com vs Sem Indice", fontsize=14)
+    ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
+    ax.legend(fontsize=11); ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    plt.tight_layout()
+    _salvar(fig, "03_docs_examinados")
+
+
+def grafico_speedup(resultados):
+    """Barras horizontais: fator de aceleracao (speedup) do indice por caso."""
+    casos   = list(resultados.keys())
+    speedup = []
+    for c in casos:
+        media_sem = resumo_estatistico(resultados[c]["sem_indice"])["media"]
+        media_com = resumo_estatistico(resultados[c]["com_indice"])["media"]
+        speedup.append(round(media_sem / media_com, 2) if media_com > 0 else 0)
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    bars = ax.barh(casos, speedup, color=COR_SPEED, edgecolor="white")
+    ax.axvline(x=1, color="gray", linestyle="--", linewidth=1, label="Sem ganho (1x)")
+    for b, v in zip(bars, speedup):
+        ax.text(v + 0.05, b.get_y() + b.get_height()/2,
+                f"{v:.2f}x", va="center", fontsize=10, fontweight="bold")
+    ax.set_xlabel("Speedup (vezes mais rapido com indice)", fontsize=11)
+    ax.set_title("Fator de Aceleracao por Uso de Indice", fontsize=14)
+    ax.legend(fontsize=10); ax.xaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    plt.tight_layout()
+    _salvar(fig, "04_speedup")
+
+
+
+
+def gerar_todos_graficos(resultados):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print("\n[Graficos] Gerando conjunto completo...")
+    grafico_comparacao_geral(resultados)
+    grafico_docs_examinados(resultados)
+    grafico_speedup(resultados)
+    print(f"[Graficos] Todos os graficos salvos em '{OUTPUT_DIR}/'")
+
+
+# -- Main ------------------------------------------------------------------------
+
+# Linhas do cabecalho fixo (impressas uma vez)
+HEADER_LINES = []
+# Bloco mutavel exibido abaixo da barra (apagado a cada caso)
+_BLOCO_ATUAL = []
+# Referencia global para a barra de progresso
+_BARRA = None
+
+def _redesenhar_tela():
+    """Limpa a tela e redesenha o cabecalho, o bloco atual e a barra."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    for linha in HEADER_LINES:
+        print(linha)
+    print("")
+    for linha in _BLOCO_ATUAL:
+        print(linha)
+    if _BARRA:
+        print("")
+        _BARRA.refresh()
+
+def log_header(msg):
+    """Adiciona uma linha de cabecalho fixo."""
+    HEADER_LINES.append(msg)
+    _redesenhar_tela()
+
+def log(msg):
+    """Adiciona uma linha ao bloco mutavel."""
+    _BLOCO_ATUAL.append(msg)
+    _redesenhar_tela()
+
+def log_bloco(linhas):
+    """Substitui o bloco mutavel inteiro de uma vez."""
+    _BLOCO_ATUAL.clear()
+    _BLOCO_ATUAL.extend(linhas)
+    _redesenhar_tela()
+
+def reset_bloco():
+    """Apaga o bloco mutavel sem escrever nada (transicao entre casos)."""
+    _BLOCO_ATUAL.clear()
+    _redesenhar_tela()
+
+def main():
+    total_medicoes = REPETICOES * 2 * 5  # 2 rodadas (sem/com indice) x 5 casos
+
+    log_header("=== BD2 - Experimentos MongoDB ===")
+    log_header(f"[Config] Dataset alvo: {TAMANHO_GB} GB (~{TAMANHO:,} documentos estimados)")
+
+    client = MongoClient(MONGO_URI)
+    db     = client[DB_NAME]
+    col    = db[COL_NAME]
+
+    if col.count_documents({}) < TAMANHO:
+        popular_banco(col)
+    else:
+        log_header(f"[Dataset] Collection ja possui {col.count_documents({}):,} documentos. Pulando insercao.")
+
+    log_header("")
+    resultados = {}
+    global _BARRA
+    with tqdm(total=total_medicoes, desc="Progresso total", unit="exec", position=0, leave=True,
+              bar_format="{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}]") as barra:
+        _BARRA = barra
+        resultados[LABELS_CASOS[0]] = caso_1_busca_simples(col, barra, log)
+        reset_bloco()
+        resultados[LABELS_CASOS[1]] = caso_2_filtro_composto(col, barra, log)
+        reset_bloco()
+        resultados[LABELS_CASOS[2]] = caso_3_faixa_numerica(col, barra, log)
+        reset_bloco()
+        resultados[LABELS_CASOS[3]] = caso_4_intervalo_datas(col, barra, log)
+        reset_bloco()
+        resultados[LABELS_CASOS[4]] = caso_5_busca_textual(col, barra, log)
+        reset_bloco()
+
+    print("\n[Info] Gerando graficos...")
+    gerar_todos_graficos(resultados)
+    print("\n=== Experimentos concluidos ===\n")
+    client.close()
+
+if __name__ == "__main__":
+    main()
