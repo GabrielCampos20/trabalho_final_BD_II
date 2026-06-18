@@ -100,6 +100,8 @@ def remover_indices(col):
             col.drop_index(idx)
 
 def medir_query(col, filtro, repeticoes=REPETICOES, barra=None):
+    # Warm-up de cache
+    list(col.find(filtro))
     tempos = []
     for _ in range(repeticoes):
         inicio = time.perf_counter()
@@ -109,14 +111,21 @@ def medir_query(col, filtro, repeticoes=REPETICOES, barra=None):
             barra.update(1)
     return tempos
 
-def explain_query(col, filtro):
+def explain_query(col, filtro, nome_caso, tipo):
     resultado = col.find(filtro).explain()
-    stats = resultado["executionStats"]
+    
+    dir_explains = os.path.join(OUTPUT_DIR, "explains")
+    os.makedirs(dir_explains, exist_ok=True)
+    arquivo_json = os.path.join(dir_explains, f"{nome_caso}_{tipo}.json")
+    with open(arquivo_json, "w", encoding="utf-8") as f:
+        json.dump(resultado, f, indent=4, default=str)
+        
+    stats = resultado.get("executionStats", {})
     return {
         "stage":               resultado["queryPlanner"]["winningPlan"].get("stage", "N/A"),
-        "executionTimeMillis": stats["executionTimeMillis"],
-        "totalDocsExamined":   stats["totalDocsExamined"],
-        "totalKeysExamined":   stats["totalKeysExamined"],
+        "executionTimeMillis": stats.get("executionTimeMillis", 0),
+        "totalDocsExamined":   stats.get("totalDocsExamined", 0),
+        "totalKeysExamined":   stats.get("totalKeysExamined", 0),
     }
 
 def resumo_estatistico(tempos):
@@ -150,12 +159,12 @@ def caso_1_busca_simples(col, barra=None, log=print):
     remover_indices(col)
 
     tempos_sem = medir_query(col, filtro, barra=barra)
-    exp_sem    = explain_query(col, filtro)
+    exp_sem    = explain_query(col, filtro, "caso_1", "sem_indice")
     imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
 
     col.create_index([("estado", ASCENDING)])
     tempos_com = medir_query(col, filtro, barra=barra)
-    exp_com    = explain_query(col, filtro)
+    exp_com    = explain_query(col, filtro, "caso_1", "com_indice")
     imprimir_resultado("Com indice (single field)", tempos_com, exp_com, log)
 
     remover_indices(col)
@@ -173,12 +182,12 @@ def caso_2_filtro_composto(col, barra=None, log=print):
     remover_indices(col)
 
     tempos_sem = medir_query(col, filtro, barra=barra)
-    exp_sem    = explain_query(col, filtro)
+    exp_sem    = explain_query(col, filtro, "caso_1", "sem_indice")
     imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
 
     col.create_index([("estado", ASCENDING), ("ativo", ASCENDING)])
     tempos_com = medir_query(col, filtro, barra=barra)
-    exp_com    = explain_query(col, filtro)
+    exp_com    = explain_query(col, filtro, "caso_1", "com_indice")
     imprimir_resultado("Com indice composto", tempos_com, exp_com, log)
 
     remover_indices(col)
@@ -196,12 +205,12 @@ def caso_3_faixa_numerica(col, barra=None, log=print):
     remover_indices(col)
 
     tempos_sem = medir_query(col, filtro, barra=barra)
-    exp_sem    = explain_query(col, filtro)
+    exp_sem    = explain_query(col, filtro, "caso_1", "sem_indice")
     imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
 
     col.create_index([("salario", ASCENDING)])
     tempos_com = medir_query(col, filtro, barra=barra)
-    exp_com    = explain_query(col, filtro)
+    exp_com    = explain_query(col, filtro, "caso_1", "com_indice")
     imprimir_resultado("Com indice (range)", tempos_com, exp_com, log)
 
     remover_indices(col)
@@ -212,18 +221,22 @@ def caso_4_intervalo_datas(col, barra=None, log=print):
     log("=" * 60)
     log("CASO 4 - Busca por intervalo de datas (criado_em)")
     log("=" * 60)
-    ano = random.randint(DATA_INICIO.year, DATA_FIM.year - 1)
+    
+    # Pegar um ano que com certeza existe no banco para evitar query vazia (0 docs)
+    amostra = list(col.aggregate([{"$sample": {"size": 1}}]))
+    ano = amostra[0]["criado_em"].year if amostra else DATA_INICIO.year
+    
     filtro = {"criado_em": {"$gte": datetime(ano, 1, 1), "$lte": datetime(ano, 12, 31)}}
     log(f"  Filtro: criado_em em {ano}\n")
     remover_indices(col)
 
     tempos_sem = medir_query(col, filtro, barra=barra)
-    exp_sem    = explain_query(col, filtro)
+    exp_sem    = explain_query(col, filtro, "caso_1", "sem_indice")
     imprimir_resultado("Sem indice", tempos_sem, exp_sem, log)
 
     col.create_index([("criado_em", ASCENDING)])
     tempos_com = medir_query(col, filtro, barra=barra)
-    exp_com    = explain_query(col, filtro)
+    exp_com    = explain_query(col, filtro, "caso_1", "com_indice")
     imprimir_resultado("Com indice (date)", tempos_com, exp_com, log)
 
     remover_indices(col)
@@ -240,20 +253,88 @@ def caso_5_busca_textual(col, barra=None, log=print):
 
     filtro_regex = {"profissao": {"$regex": profissao, "$options": "i"}}
     tempos_sem   = medir_query(col, filtro_regex, barra=barra)
-    exp_sem      = explain_query(col, filtro_regex)
+    exp_sem      = explain_query(col, filtro_regex, "caso_1", "sem_indice")
     imprimir_resultado("Sem indice (regex)", tempos_sem, exp_sem, log)
 
     col.create_index([("profissao", TEXT)])
     filtro_text = {"$text": {"$search": profissao}}
     tempos_com  = medir_query(col, filtro_text, barra=barra)
-    exp_com     = explain_query(col, filtro_text)
+    exp_com     = explain_query(col, filtro_text, "caso_1", "com_indice")
     imprimir_resultado("Com indice (text)", tempos_com, exp_com, log)
 
     remover_indices(col)
     return {"sem_indice": tempos_sem, "com_indice": tempos_com,
             "exp_sem": exp_sem, "exp_com": exp_com}
 
+
+def caso_6_escrita_e_armazenamento(col, db, barra=None, log=print):
+    log("=" * 60)
+    log("CASO 6 - Sobrecarga de Escrita e Armazenamento")
+    log("=" * 60)
+    remover_indices(col)
+    
+    tamanho_lote = 5000
+    docs_teste = [gerar_usuario() for _ in range(tamanho_lote)]
+    
+    stats_sem = db.command("collStats", col.name)
+    tamanho_index_sem = stats_sem.get("totalIndexSize", 0) / (1024 * 1024)
+    
+    log("  Medindo insercao SEM indice...")
+    tempos_sem = []
+    for _ in range(REPETICOES):
+        docs = [d.copy() for d in docs_teste]
+        for d in docs: d.pop("_id", None)
+        inicio = time.perf_counter()
+        res = col.insert_many(docs)
+        tempos_sem.append((time.perf_counter() - inicio) * 1000)
+        col.delete_many({"_id": {"$in": res.inserted_ids}})
+        if barra: barra.update(1)
+        
+    est_sem = resumo_estatistico(tempos_sem)
+    log(f"  [Sem indices extras]")
+    log(f"    Tamanho dos indices: {tamanho_index_sem:.2f} MB")
+    log(f"    Tempo medio de insercao: {est_sem['media']} ms")
+    
+    log("\n  Criando indices dos Casos 1 a 5...")
+    from pymongo import IndexModel
+    col.create_indexes([
+        IndexModel([("estado", ASCENDING)]),
+        IndexModel([("estado", ASCENDING), ("ativo", ASCENDING)]),
+        IndexModel([("salario", ASCENDING)]),
+        IndexModel([("criado_em", ASCENDING)]),
+        IndexModel([("profissao", TEXT)])
+    ])
+    
+    stats_com = db.command("collStats", col.name)
+    tamanho_index_com = stats_com.get("totalIndexSize", 0) / (1024 * 1024)
+    
+    log("  Medindo insercao COM indices...")
+    tempos_com = []
+    for _ in range(REPETICOES):
+        docs = [d.copy() for d in docs_teste]
+        for d in docs: d.pop("_id", None)
+        inicio = time.perf_counter()
+        res = col.insert_many(docs)
+        tempos_com.append((time.perf_counter() - inicio) * 1000)
+        col.delete_many({"_id": {"$in": res.inserted_ids}})
+        if barra: barra.update(1)
+        
+    est_com = resumo_estatistico(tempos_com)
+    log(f"  [Com indices extras]")
+    log(f"    Tamanho dos indices: {tamanho_index_com:.2f} MB (+{tamanho_index_com - tamanho_index_sem:.2f} MB)")
+    log(f"    Tempo medio de insercao: {est_com['media']} ms")
+    
+    remover_indices(col)
+    
+    return {
+        "sem_indice": tempos_sem, 
+        "com_indice": tempos_com,
+        "tamanho_index_sem_mb": tamanho_index_sem,
+        "tamanho_index_com_mb": tamanho_index_com
+    }
+
 # -- Graficos --------------------------------------------------------------------
+
 
 LABELS_CASOS = [
     "Caso 1\nCampo unico",
@@ -261,11 +342,12 @@ LABELS_CASOS = [
     "Caso 3\nFaixa numerica",
     "Caso 4\nDatas",
     "Caso 5\nTextual",
+    "Caso 6\nEscritas/Armazenamento",
 ]
 
-COR_SEM   = "#E05C5C"
-COR_COM   = "#4C9BE8"
-COR_SPEED = "#5BBF7A"
+COR_SEM   = "#D32F2F"
+COR_COM   = "#1976D2"
+COR_SPEED = "#388E3C"
 
 
 def _salvar(fig, nome):
@@ -277,7 +359,7 @@ def _salvar(fig, nome):
 
 def grafico_comparacao_geral(resultados):
     """Barras agrupadas: tempo medio com vs sem indice para todos os casos."""
-    casos      = list(resultados.keys())
+    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
     medias_sem = [resumo_estatistico(resultados[c]["sem_indice"])["media"] for c in casos]
     medias_com = [resumo_estatistico(resultados[c]["com_indice"])["media"] for c in casos]
     erros_sem  = [resumo_estatistico(resultados[c]["sem_indice"])["desvio_pad"] for c in casos]
@@ -296,7 +378,7 @@ def grafico_comparacao_geral(resultados):
     ax.set_ylabel("Tempo medio (ms)", fontsize=12)
     ax.set_title("Visao Geral - Tempo Medio por Caso de Uso", fontsize=14)
     ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
-    ax.legend(fontsize=11); ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    ax.legend(fontsize=11)
     plt.tight_layout()
     _salvar(fig, "01_comparacao_geral")
 
@@ -304,6 +386,7 @@ def grafico_comparacao_geral(resultados):
 def graficos_por_caso(resultados):
     """Um grafico de barras individual para cada caso de uso."""
     for i, (caso, dados) in enumerate(resultados.items(), 1):
+        if "Caso 6" in caso: continue
         est_sem = resumo_estatistico(dados["sem_indice"])
         est_com = resumo_estatistico(dados["com_indice"])
         categorias = ["Sem indice", "Com indice"]
@@ -320,14 +403,13 @@ def graficos_por_caso(resultados):
         titulo = caso.replace("\n", " - ")
         ax.set_title(f"Tempo Medio - {titulo}", fontsize=13)
         ax.set_ylabel("Tempo medio (ms)", fontsize=11)
-        ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
         plt.tight_layout()
         _salvar(fig, f"02_caso_{i}_tempo")
 
 
 def grafico_docs_examinados(resultados):
     """Barras agrupadas: documentos examinados com vs sem indice."""
-    casos    = list(resultados.keys())
+    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
     docs_sem = [resultados[c]["exp_sem"]["totalDocsExamined"] for c in casos]
     docs_com = [resultados[c]["exp_com"]["totalDocsExamined"] for c in casos]
 
@@ -342,14 +424,14 @@ def grafico_docs_examinados(resultados):
     ax.set_ylabel("Documentos Examinados", fontsize=12)
     ax.set_title("Documentos Examinados pelo MongoDB - Com vs Sem Indice", fontsize=14)
     ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
-    ax.legend(fontsize=11); ax.yaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    ax.legend(fontsize=11)
     plt.tight_layout()
     _salvar(fig, "03_docs_examinados")
 
 
 def grafico_speedup(resultados):
     """Barras horizontais: fator de aceleracao (speedup) do indice por caso."""
-    casos   = list(resultados.keys())
+    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
     speedup = []
     for c in casos:
         media_sem = resumo_estatistico(resultados[c]["sem_indice"])["media"]
@@ -358,17 +440,76 @@ def grafico_speedup(resultados):
 
     fig, ax = plt.subplots(figsize=(9, 6))
     bars = ax.barh(casos, speedup, color=COR_SPEED, edgecolor="white")
+    
+    # Usar escala logarítmica para impedir que speedups gigantes engulam os menores
+    ax.set_xscale("log")
+    ax.set_xlim(left=0.5) # Iniciar um pouco antes do 1x para nao cortar
+    
     ax.axvline(x=1, color="gray", linestyle="--", linewidth=1, label="Sem ganho (1x)")
     for b, v in zip(bars, speedup):
-        ax.text(v + 0.05, b.get_y() + b.get_height()/2,
+        offset = v * 1.15 if v > 0 else 1.15
+        ax.text(offset, b.get_y() + b.get_height()/2,
                 f"{v:.2f}x", va="center", fontsize=10, fontweight="bold")
-    ax.set_xlabel("Speedup (vezes mais rapido com indice)", fontsize=11)
-    ax.set_title("Fator de Aceleracao por Uso de Indice", fontsize=14)
-    ax.legend(fontsize=10); ax.xaxis.grid(True, linestyle="--", alpha=0.7); ax.set_axisbelow(True)
+    ax.set_xlabel("Speedup (Escala Logarítmica - vezes mais rápido)", fontsize=11)
+    ax.set_title("Fator de Aceleração por Uso de Índice", fontsize=14)
+    ax.legend(fontsize=10)
     plt.tight_layout()
     _salvar(fig, "04_speedup")
 
 
+
+
+
+def exportar_latex(resultados):
+    linhas = []
+    linhas.append("\\begin{table}[htpb]")
+    linhas.append("\\centering")
+    linhas.append("\\caption{Comparativo de Desempenho e Documentos Examinados}")
+    linhas.append("\\label{tab:resultados}")
+    linhas.append("\\begin{tabular}{l|rr|rr|r}")
+    linhas.append("\\hline")
+    linhas.append("\\textbf{Caso de Uso} & \\textbf{Tempo Sem (ms)} & \\textbf{Docs Sem} & \\textbf{Tempo Com (ms)} & \\textbf{Docs Com} & \\textbf{Speedup} \\\\")
+    linhas.append("\\hline")
+    
+    for nome, dados in resultados.items():
+        if "Caso 6" in nome: continue
+        t_sem = resumo_estatistico(dados["sem_indice"])["media"]
+        t_com = resumo_estatistico(dados["com_indice"])["media"]
+        docs_sem = dados["exp_sem"]["totalDocsExamined"]
+        docs_com = dados["exp_com"]["totalDocsExamined"]
+        speedup = round(t_sem / t_com, 2) if t_com > 0 else 0
+        nome_limpo = nome.replace("\n", " ")
+        linhas.append(f"{nome_limpo} & {t_sem:.2f} & {docs_sem:,} & {t_com:.2f} & {docs_com:,} & {speedup}x \\\\")
+        
+    linhas.append("\\hline")
+    linhas.append("\\end{tabular}")
+    linhas.append("\\end{table}")
+    
+    if any("Caso 6" in k for k in resultados.keys()):
+        for nome, dados in resultados.items():
+            if "Caso 6" in nome:
+                linhas.append("\n\\begin{table}[htpb]")
+                linhas.append("\\centering")
+                linhas.append("\\caption{Impacto dos Índices no Armazenamento e Inserção}")
+                linhas.append("\\label{tab:impacto_indices}")
+                linhas.append("\\begin{tabular}{l|rr}")
+                linhas.append("\\hline")
+                linhas.append("\\textbf{Cenário} & \\textbf{Tamanho dos Índices (MB)} & \\textbf{Tempo de Inserção (ms)} \\\\")
+                linhas.append("\\hline")
+                t_sem = resumo_estatistico(dados["sem_indice"])["media"]
+                t_com = resumo_estatistico(dados["com_indice"])["media"]
+                tam_sem = dados["tamanho_index_sem_mb"]
+                tam_com = dados["tamanho_index_com_mb"]
+                linhas.append(f"Sem Índices & {tam_sem:.2f} & {t_sem:.2f} \\\\")
+                linhas.append(f"Com Todos os Índices & {tam_com:.2f} & {t_com:.2f} \\\\")
+                linhas.append("\\hline")
+                linhas.append("\\end{tabular}")
+                linhas.append("\\end{table}")
+                
+    caminho = os.path.join(OUTPUT_DIR, "tabelas.tex")
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write("\n".join(linhas))
+    print(f"  -> {caminho}")
 
 
 def gerar_todos_graficos(resultados):
@@ -377,6 +518,7 @@ def gerar_todos_graficos(resultados):
     grafico_comparacao_geral(resultados)
     grafico_docs_examinados(resultados)
     grafico_speedup(resultados)
+    exportar_latex(resultados)
     print(f"[Graficos] Todos os graficos salvos em '{OUTPUT_DIR}/'")
 
 
@@ -423,7 +565,7 @@ def reset_bloco():
     _redesenhar_tela()
 
 def main():
-    total_medicoes = REPETICOES * 2 * 5  # 2 rodadas (sem/com indice) x 5 casos
+    total_medicoes = REPETICOES * 2 * 6  # 2 rodadas (sem/com indice) x 6 casos
 
     log_header("=== BD2 - Experimentos MongoDB ===")
     log_header(f"[Config] Dataset alvo: {TAMANHO_GB} GB (~{TAMANHO:,} documentos estimados)")
@@ -452,6 +594,8 @@ def main():
         resultados[LABELS_CASOS[3]] = caso_4_intervalo_datas(col, barra, log)
         reset_bloco()
         resultados[LABELS_CASOS[4]] = caso_5_busca_textual(col, barra, log)
+        reset_bloco()
+        resultados[LABELS_CASOS[5]] = caso_6_escrita_e_armazenamento(col, db, barra, log)
         reset_bloco()
 
     print("\n[Info] Gerando graficos...")
