@@ -10,7 +10,19 @@
     "batch_size": 1000
   },
   "experimentos": {
-    "repeticoes": 10
+    "repeticoes": 10,
+    "seed": 42,
+    "filtros": {
+      "modo": "automatico",
+      "manual": {
+        "estado": "SP",
+        "ativo": true,
+        "salario_min": 5000.0,
+        "salario_max": 10000.0,
+        "ano": 2020,
+        "profissao": "Desenvolvedor"
+      }
+    }
   },
   "graficos": {
     "output_dir": "resultados",

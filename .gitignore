@@ -16,7 +16,7 @@ __pycache__/
 *.swo
 
 # Resultados gerados pelos experimentos
-resultados/
+resultados/*
 
 # Arquivos de sistema operacional
 .DS_Store

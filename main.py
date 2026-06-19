@@ -4,6 +4,7 @@ import time
 import random
 from datetime import datetime, timedelta
 
+import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from pymongo import MongoClient, ASCENDING, TEXT
@@ -35,6 +36,13 @@ DPI        = CFG["graficos"]["dpi"]
 FORMATO    = CFG["graficos"]["formato"]
 
 fake = Faker(LOCALE)
+
+SEED       = CFG["experimentos"].get("seed", 42)
+FILTROS    = CFG["experimentos"].get("filtros", {"modo": "automatico"})
+
+random.seed(SEED)
+np.random.seed(SEED)
+Faker.seed(SEED)
 
 SAL_MIN     = round(random.uniform(1000.0, 3000.0), 2)
 SAL_MAX     = round(random.uniform(8000.0, 25000.0), 2)
@@ -153,7 +161,10 @@ def caso_1_busca_simples(col, barra=None, log=print):
     log("=" * 60)
     log("CASO 1 - Busca simples por campo unico (estado)")
     log("=" * 60)
-    estado = random.choice(ESTADOS)
+    if FILTROS.get("modo") == "manual":
+        estado = FILTROS["manual"]["estado"]
+    else:
+        estado = random.choice(ESTADOS)
     filtro = {"estado": estado}
     log(f"  Filtro: estado = {estado}\n")
     remover_indices(col)
@@ -175,8 +186,12 @@ def caso_2_filtro_composto(col, barra=None, log=print):
     log("=" * 60)
     log("CASO 2 - Filtro composto (estado + ativo)")
     log("=" * 60)
-    estado = random.choice(ESTADOS)
-    ativo  = random.choice([True, False])
+    if FILTROS.get("modo") == "manual":
+        estado = FILTROS["manual"]["estado"]
+        ativo = FILTROS["manual"]["ativo"]
+    else:
+        estado = random.choice(ESTADOS)
+        ativo  = random.choice([True, False])
     filtro = {"estado": estado, "ativo": ativo}
     log(f"  Filtro: estado = {estado}, ativo = {ativo}\n")
     remover_indices(col)
@@ -198,8 +213,12 @@ def caso_3_faixa_numerica(col, barra=None, log=print):
     log("=" * 60)
     log("CASO 3 - Busca por faixa numerica (salario)")
     log("=" * 60)
-    faixa_min = round(random.uniform(SAL_MIN, (SAL_MIN + SAL_MAX) / 2), 2)
-    faixa_max = round(random.uniform((SAL_MIN + SAL_MAX) / 2, SAL_MAX), 2)
+    if FILTROS.get("modo") == "manual":
+        faixa_min = FILTROS["manual"]["salario_min"]
+        faixa_max = FILTROS["manual"]["salario_max"]
+    else:
+        faixa_min = round(random.uniform(SAL_MIN, (SAL_MIN + SAL_MAX) / 2), 2)
+        faixa_max = round(random.uniform((SAL_MIN + SAL_MAX) / 2, SAL_MAX), 2)
     filtro = {"salario": {"$gte": faixa_min, "$lte": faixa_max}}
     log(f"  Filtro: salario entre R$ {faixa_min:,.2f} e R$ {faixa_max:,.2f}\n")
     remover_indices(col)
@@ -222,9 +241,12 @@ def caso_4_intervalo_datas(col, barra=None, log=print):
     log("CASO 4 - Busca por intervalo de datas (criado_em)")
     log("=" * 60)
     
-    # Pegar um ano que com certeza existe no banco para evitar query vazia (0 docs)
-    amostra = list(col.aggregate([{"$sample": {"size": 1}}]))
-    ano = amostra[0]["criado_em"].year if amostra else DATA_INICIO.year
+    if FILTROS.get("modo") == "manual":
+        ano = FILTROS["manual"]["ano"]
+    else:
+        # Pegar um ano que com certeza existe no banco para evitar query vazia (0 docs)
+        amostra = list(col.aggregate([{"$sample": {"size": 1}}]))
+        ano = amostra[0]["criado_em"].year if amostra else DATA_INICIO.year
     
     filtro = {"criado_em": {"$gte": datetime(ano, 1, 1), "$lte": datetime(ano, 12, 31)}}
     log(f"  Filtro: criado_em em {ano}\n")
@@ -247,7 +269,10 @@ def caso_5_busca_textual(col, barra=None, log=print):
     log("=" * 60)
     log("CASO 5 - Busca textual (profissao)")
     log("=" * 60)
-    profissao = random.choice(PROFISSOES)
+    if FILTROS.get("modo") == "manual":
+        profissao = FILTROS["manual"]["profissao"]
+    else:
+        profissao = random.choice(PROFISSOES)
     log(f"  Filtro: profissao = '{profissao}'\n")
     remover_indices(col)
 
@@ -351,7 +376,7 @@ COR_SPEED = "#388E3C"
 
 
 def _salvar(fig, nome):
-    caminho = os.path.join(OUTPUT_DIR, f"{nome}.{FORMATO}")
+    caminho = os.path.join(OUTPUT_DIR, "graficos", f"{nome}.{FORMATO}")
     fig.savefig(caminho, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  -> {caminho}")
@@ -445,7 +470,7 @@ def grafico_speedup(resultados):
     ax.set_xscale("log")
     ax.set_xlim(left=0.5) # Iniciar um pouco antes do 1x para nao cortar
     
-    ax.axvline(x=1, color="gray", linestyle="--", linewidth=1, label="Sem ganho (1x)")
+    ax.axvline(x=1, color=COR_SEM, linestyle="--", linewidth=1, label="Sem ganho (1x)")
     for b, v in zip(bars, speedup):
         offset = v * 1.15 if v > 0 else 1.15
         ax.text(offset, b.get_y() + b.get_height()/2,
@@ -460,6 +485,83 @@ def grafico_speedup(resultados):
 
 
 
+def grafico_boxplot_estabilidade(resultados):
+    """Boxplot para mostrar a variancia dos tempos (com vs sem indice)."""
+    casos = [c for c in resultados.keys() if "Caso 6" not in c]
+    dados_sem = [resultados[c]["sem_indice"] for c in casos]
+    dados_com = [resultados[c]["com_indice"] for c in casos]
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    pos_sem = np.arange(len(casos)) * 2.0 - 0.4
+    pos_com = np.arange(len(casos)) * 2.0 + 0.4
+    
+    bp_sem = ax.boxplot(dados_sem, positions=pos_sem, widths=0.6, patch_artist=True)
+    bp_com = ax.boxplot(dados_com, positions=pos_com, widths=0.6, patch_artist=True)
+    
+    for patch in bp_sem['boxes']:
+        patch.set_facecolor(COR_SEM)
+        patch.set_alpha(0.7)
+    for patch in bp_com['boxes']:
+        patch.set_facecolor(COR_COM)
+        patch.set_alpha(0.7)
+        
+    for median in bp_sem['medians']: median.set_color('black')
+    for median in bp_com['medians']: median.set_color('black')
+        
+    ax.set_xticks(np.arange(len(casos)) * 2.0)
+    ax.set_xticklabels([c.replace('\n', ' ') for c in casos], rotation=15, ha="right", fontsize=9)
+    ax.set_ylabel("Tempo de Execucao (ms) - Escala Log", fontsize=11)
+    ax.set_yscale("log")
+    ax.set_title("Estabilidade das Consultas (Boxplot das Repeticoes)", fontsize=14)
+    
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor=COR_SEM, label='Sem Indice', alpha=0.7),
+                       Patch(facecolor=COR_COM, label='Com Indice', alpha=0.7)]
+    ax.legend(handles=legend_elements, fontsize=11)
+    plt.tight_layout()
+    _salvar(fig, "05_boxplot_estabilidade")
+
+
+def grafico_penalidade_escrita(resultados):
+    """Bar chart do tempo de insercao."""
+    chave_c6 = next((k for k in resultados.keys() if "Caso 6" in k), None)
+    if not chave_c6: return
+    
+    dados = resultados[chave_c6]
+    t_sem = resumo_estatistico(dados["sem_indice"])["media"]
+    t_com = resumo_estatistico(dados["com_indice"])["media"]
+    
+    fig, ax = plt.subplots(figsize=(7, 5))
+    bars = ax.bar(["Sem indices extras", "Com todos os indices"], [t_sem, t_com], color=[COR_SEM, COR_COM], width=0.5)
+    for b in bars:
+        ax.text(b.get_x() + b.get_width()/2, b.get_height() + (max(t_sem, t_com) * 0.02),
+                f"{b.get_height():.1f} ms", ha="center", va="bottom", fontsize=11, fontweight="bold")
+    ax.set_ylabel("Tempo Medio de Insercao Lote (ms)", fontsize=11)
+    ax.set_title("Penalidade de Escrita (Trade-off de Indices)", fontsize=13)
+    plt.tight_layout()
+    _salvar(fig, "06_penalidade_escrita")
+
+
+def grafico_overhead_armazenamento(resultados):
+    """Bar chart comparando o tamanho dos indices."""
+    chave_c6 = next((k for k in resultados.keys() if "Caso 6" in k), None)
+    if not chave_c6: return
+    
+    dados = resultados[chave_c6]
+    tam_sem = dados["tamanho_index_sem_mb"]
+    tam_com = dados["tamanho_index_com_mb"]
+    
+    fig, ax = plt.subplots(figsize=(7, 5))
+    bars = ax.bar(["Apenas _id padrao", "Todos os Indices"], [tam_sem, tam_com], color=[COR_SEM, COR_COM], width=0.5)
+    for b in bars:
+        ax.text(b.get_x() + b.get_width()/2, b.get_height() + (max(tam_sem, tam_com) * 0.02),
+                f"{b.get_height():.1f} MB", ha="center", va="bottom", fontsize=11, fontweight="bold")
+    ax.set_ylabel("Espaco em Disco Ocupado (MB)", fontsize=11)
+    ax.set_title("Overhead de Armazenamento (Tamanho dos Indices)", fontsize=13)
+    plt.tight_layout()
+    _salvar(fig, "07_overhead_armazenamento")
+
+
 def exportar_latex(resultados):
     linhas = []
     linhas.append("\\begin{table}[htpb]")
@@ -468,7 +570,7 @@ def exportar_latex(resultados):
     linhas.append("\\label{tab:resultados}")
     linhas.append("\\begin{tabular}{l|rr|rr|r}")
     linhas.append("\\hline")
-    linhas.append("\\textbf{Caso de Uso} & \\textbf{Tempo Sem (ms)} & \\textbf{Docs Sem} & \\textbf{Tempo Com (ms)} & \\textbf{Docs Com} & \\textbf{Speedup} \\\\")
+    linhas.append("\\textbf{Caso de Uso} & \\textbf{Tempo sem Índice (ms)} & \\textbf{Docs. Examinados (Sem)} & \\textbf{Tempo com Índice (ms)} & \\textbf{Docs. Examinados (Com)} & \\textbf{Fator de Aceleração (Speedup)} \\\\")
     linhas.append("\\hline")
     
     for nome, dados in resultados.items():
@@ -506,19 +608,75 @@ def exportar_latex(resultados):
                 linhas.append("\\end{tabular}")
                 linhas.append("\\end{table}")
                 
-    caminho = os.path.join(OUTPUT_DIR, "tabelas.tex")
+    caminho = os.path.join(OUTPUT_DIR, "latex", "tabelas.tex")
     with open(caminho, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas))
     print(f"  -> {caminho}")
 
 
+def exportar_csv(resultados):
+    # 1. Agregado Consultas (Medias)
+    caminho_agregado = os.path.join(OUTPUT_DIR, "csv", "consultas_agregado.csv")
+    with open(caminho_agregado, mode="w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Caso de Uso", "Tempo Medio Sem Indice (ms)", "Tempo Medio Com Indice (ms)", "Docs Sem Indice", "Docs Com Indice", "Speedup"])
+        casos = [c for c in resultados.keys() if "Caso 6" not in c]
+        for nome in casos:
+            dados = resultados[nome]
+            t_sem = resumo_estatistico(dados["sem_indice"])["media"]
+            t_com = resumo_estatistico(dados["com_indice"])["media"]
+            docs_sem = dados["exp_sem"]["totalDocsExamined"]
+            docs_com = dados["exp_com"]["totalDocsExamined"]
+            speedup = round(t_sem / t_com, 2) if t_com > 0 else 0
+            nome_limpo = nome.replace("\n", " ")
+            writer.writerow([nome_limpo, t_sem, t_com, docs_sem, docs_com, speedup])
+    print(f"  -> {caminho_agregado}")
+
+    # 2. Bruto Consultas (Todas as execucoes)
+    caminho_bruto = os.path.join(OUTPUT_DIR, "csv", "consultas_bruto.csv")
+    with open(caminho_bruto, mode="w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Caso de Uso", "Cenario", "Repeticao", "Tempo (ms)"])
+        for nome in casos:
+            dados = resultados[nome]
+            nome_limpo = nome.replace("\n", " ")
+            for i, t in enumerate(dados["sem_indice"]):
+                writer.writerow([nome_limpo, "Sem Indice", i + 1, round(t, 3)])
+            for i, t in enumerate(dados["com_indice"]):
+                writer.writerow([nome_limpo, "Com Indice", i + 1, round(t, 3)])
+    print(f"  -> {caminho_bruto}")
+
+    # 3. Caso 6 (Escrita e Armazenamento)
+    if any("Caso 6" in k for k in resultados.keys()):
+        caminho_escrita = os.path.join(OUTPUT_DIR, "csv", "escrita_armazenamento.csv")
+        with open(caminho_escrita, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Cenario", "Tamanho dos Indices (MB)", "Tempo Medio de Insercao (ms)"])
+            for nome, dados in resultados.items():
+                if "Caso 6" in nome:
+                    t_sem = resumo_estatistico(dados["sem_indice"])["media"]
+                    t_com = resumo_estatistico(dados["com_indice"])["media"]
+                    tam_sem = dados["tamanho_index_sem_mb"]
+                    tam_com = dados["tamanho_index_com_mb"]
+                    writer.writerow(["Sem Indices", round(tam_sem, 2), t_sem])
+                    writer.writerow(["Com Todos os Indices", round(tam_com, 2), t_com])
+        print(f"  -> {caminho_escrita}")
+
+
 def gerar_todos_graficos(resultados):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "graficos"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "latex"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "csv"), exist_ok=True)
     print("\n[Graficos] Gerando conjunto completo...")
     grafico_comparacao_geral(resultados)
     grafico_docs_examinados(resultados)
     grafico_speedup(resultados)
+    grafico_boxplot_estabilidade(resultados)
+    grafico_penalidade_escrita(resultados)
+    grafico_overhead_armazenamento(resultados)
     exportar_latex(resultados)
+    exportar_csv(resultados)
     print(f"[Graficos] Todos os graficos salvos em '{OUTPUT_DIR}/'")
 
 
