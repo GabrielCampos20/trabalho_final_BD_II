@@ -758,7 +758,9 @@ def main():
 
     print("\n[Info] Gerando graficos...")
     gerar_todos_graficos(resultados)
-    print("\n=== Experimentos concluidos ===\n")
+    print("\n[Info] Excluindo banco de dados (1 GB) para liberar espaco no disco...")
+    client.drop_database(DB_NAME)
+    print("=== Experimentos concluidos ===\n")
     client.close()
 
 if __name__ == "__main__":

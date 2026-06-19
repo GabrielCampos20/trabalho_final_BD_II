@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Servidor de Configuração (Metadados)
+  configsvr:
+    image: mongo:latest
+    container_name: mongo-configsvr
+    command: mongod --configsvr --replSet configRS --port 27019 --bind_ip_all
+    ports:
+      - 27019:27019
+
+  # Nó 1 de Dados
+  shard1:
+    image: mongo:latest
+    container_name: mongo-shard1
+    command: mongod --shardsvr --replSet shard1RS --port 27018 --bind_ip_all
+    ports:
+      - 27018:27018
+
+  # Nó 2 de Dados
+  shard2:
+    image: mongo:latest
+    container_name: mongo-shard2
+    command: mongod --shardsvr --replSet shard2RS --port 27020 --bind_ip_all
+    ports:
+      - 27020:27020
+
+  # Roteador de Queries (Mongos)
+  mongos:
+    image: mongo:latest
+    container_name: mongo-router
+    command: mongos --configdb configRS/configsvr:27019 --port 27017 --bind_ip_all
+    ports:
+      - 27017:27017
+    depends_on:
+      - configsvr
+      - shard1
+      - shard2
