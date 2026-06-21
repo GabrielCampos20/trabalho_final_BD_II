@@ -17,14 +17,14 @@ DIR_OUT = os.path.join(DIR_BASE, "graficos")
 # ==============================================================================
 # CONFIGURACOES DE DESIGN
 # ==============================================================================
-# Paleta de 5 cores em degrade (Azul Metálico) para progressao N0 -> N4
-CORES_NIVEIS = ['#B3E5FC', '#4FC3F7', '#03A9F4', '#0288D1', '#01579B']
+# Paleta de 5 cores solidas distintas e classicas (Vermelho, Laranja, Azul, Roxo, Verde)
+CORES_NIVEIS = ['#D32F2F', '#F57C00', '#1976D2', '#7B1FA2', '#388E3C']
 NIVEIS = ["N0", "N1", "N2", "N3", "N4"]
 
 FONTE_GERAL = 14
 FONTE_EIXOS = 14
 FONTE_LEGENDA = 12
-FONTE_TEXTO_BARRAS = 11
+FONTE_TEXTO_BARRAS = 10  # Reduzido para evitar sobreposicao
 
 plt.rcParams.update({
     'font.weight': 'bold',
@@ -39,7 +39,7 @@ plt.rcParams.update({
 
 def formatar_k_m(val_bruto):
     if val_bruto >= 1000000:
-        return f"{val_bruto/1000000:.2f}M"
+        return f"{val_bruto/1000000:.1f}M"
     elif val_bruto >= 1000:
         return f"{val_bruto/1000:.1f}K"
     elif val_bruto > 0:
@@ -84,19 +84,22 @@ def plotar_tempos(casos, dados_por_nivel):
     fig, ax = plt.subplots(figsize=(14, 7))
     for i, nivel in enumerate(NIVEIS):
         tempos = [max(v, 0.1) for v in dados_por_nivel[nivel]["tempos"]]
-        bars = ax.bar(x + i*w - 2*w, tempos, w, label=nivel, color=CORES_NIVEIS[i])
+        bars = ax.bar(x + i*w - 2*w, tempos, w, label=nivel, color=CORES_NIVEIS[i], edgecolor='white', linewidth=0.5)
         
         for b in bars:
             h = b.get_height()
-            ax.text(b.get_x() + b.get_width()/2, h * 1.5,
-                    f"{h:.1f}", ha="center", va="bottom", fontsize=FONTE_TEXTO_BARRAS, fontweight="bold")
+            ax.text(b.get_x() + b.get_width()/2, h * 1.2,
+                    f"{h:.1f}", ha="center", va="bottom", fontsize=FONTE_TEXTO_BARRAS, fontweight="bold", rotation=90)
 
     ax.set_xticks(x)
     ax.set_xticklabels(casos, rotation=0)
     ax.set_ylabel("Tempo Médio (ms)")
     ax.set_yscale("log")
-    ax.set_ylim(bottom=0.1, top=1000000)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=5)
+    
+    max_t = max(max(v) for v in (dados_por_nivel[n]["tempos"] for n in NIVEIS))
+    ax.set_ylim(bottom=0.1, top=max_t * 1000) # Espaco dinâmico extra pro topo em escala log
+    
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=5)
     salvar_grafico(fig, "01_tempos_otimizacao")
 
 def plotar_docs_examinados(casos, dados_por_nivel):
@@ -104,25 +107,26 @@ def plotar_docs_examinados(casos, dados_por_nivel):
     w = 0.15
 
     fig, ax = plt.subplots(figsize=(14, 7))
-    max_d = 0
     for i, nivel in enumerate(NIVEIS):
         raw_docs = dados_por_nivel[nivel]["docs"]
-        d_millions = [v / 1000000.0 for v in raw_docs]
-        if max(d_millions) > max_d: max_d = max(d_millions)
-        bars = ax.bar(x + i*w - 2*w, d_millions, w, label=nivel, color=CORES_NIVEIS[i])
+        # Usamos log scale, entao valores de 0 nao aparecem. Para contornar, forcamos altura 0.1
+        plot_docs = [max(v, 0.1) for v in raw_docs]
+        bars = ax.bar(x + i*w - 2*w, plot_docs, w, label=nivel, color=CORES_NIVEIS[i], edgecolor='white', linewidth=0.5)
         
         for j, b in enumerate(bars):
-            # Formatar so se > 0 ou se N0/N1 para evitar poluicao de zeros
             val = raw_docs[j]
-            if val > 0:
-                ax.text(b.get_x() + b.get_width()/2, b.get_height() + (max_d*0.02 if max_d > 0 else 0.1),
-                        formatar_k_m(val), ha="center", va="bottom", fontsize=9, fontweight="bold", rotation=45)
+            ax.text(b.get_x() + b.get_width()/2, b.get_height() * 1.2,
+                    formatar_k_m(val), ha="center", va="bottom", fontsize=FONTE_TEXTO_BARRAS, fontweight="bold", rotation=90)
 
     ax.set_xticks(x)
     ax.set_xticklabels(casos, rotation=0)
-    ax.set_ylabel("Milhões de Documentos Examinados (#)")
-    ax.set_ylim(bottom=0, top=max_d * 1.3 if max_d > 0 else 1)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=5)
+    ax.set_ylabel("Documentos Examinados (#)")
+    ax.set_yscale("log")
+    
+    max_d = max(max(v) for v in (dados_por_nivel[n]["docs"] for n in NIVEIS))
+    ax.set_ylim(bottom=0.1, top=max(max_d * 1000, 100)) # Espaco extra para milhoes e rotulos rotacionados
+    
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=5)
     salvar_grafico(fig, "02_docs_examinados")
 
 def plotar_speedup(casos, dados_por_nivel):
@@ -130,21 +134,23 @@ def plotar_speedup(casos, dados_por_nivel):
     w = 0.15
 
     fig, ax = plt.subplots(figsize=(14, 7))
+    max_sp = 1
     for i, nivel in enumerate(NIVEIS):
         speedup = [max(v, 1.0) for v in dados_por_nivel[nivel]["speedup"]]
-        bars = ax.bar(x + i*w - 2*w, speedup, w, label=nivel, color=CORES_NIVEIS[i])
+        if max(speedup) > max_sp: max_sp = max(speedup)
+        bars = ax.bar(x + i*w - 2*w, speedup, w, label=nivel, color=CORES_NIVEIS[i], edgecolor='white', linewidth=0.5)
         
         for b in bars:
             h = b.get_height()
-            ax.text(b.get_x() + b.get_width()/2, h * 1.5,
-                    f"{h:.1f}x", ha="center", va="bottom", fontsize=FONTE_TEXTO_BARRAS, fontweight="bold")
+            ax.text(b.get_x() + b.get_width()/2, h * 1.2,
+                    f"{h:.1f}x", ha="center", va="bottom", fontsize=FONTE_TEXTO_BARRAS, fontweight="bold", rotation=90)
 
     ax.set_xticks(x)
     ax.set_xticklabels(casos, rotation=0)
     ax.set_ylabel("Fator de Aceleração (Vezes mais rápido)")
     ax.set_yscale("log")
-    ax.set_ylim(bottom=1, top=1000000)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=5)
+    ax.set_ylim(bottom=1, top=max_sp * 500) # Espaco dinâmico para rotacao 90
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=5)
     salvar_grafico(fig, "03_speedup_otimizacao")
 
 def main():

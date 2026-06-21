@@ -73,7 +73,6 @@ def main():
 
     print("\n[5/5] Removendo relatórios e lixo antigo do disco local...")
     import shutil
-    import os
     for dir_name in ["resultados", "results"]:
         target = os.path.join(PROJECT_ROOT, dir_name)
         if os.path.exists(target):

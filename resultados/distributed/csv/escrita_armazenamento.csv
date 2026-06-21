@@ -1,3 +1,0 @@
-Cenario,Tamanho dos Indices (MB),Tempo Medio de Insercao (ms)
-Sem Indices,4018.93,114.831
-Com Todos os Indices,16160.93,22206.534

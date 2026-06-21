@@ -1,6 +1,0 @@
-Caso de Uso,Tempo Medio Sem Indice (ms),Tempo Medio Com Indice (ms),Docs Sem Indice,Docs Com Indice,Speedup
-Caso 1 Campo unico,841.39,700.268,2984773,2984773,1.2
-Caso 2 Composto,61763.996,264.011,2986338,1495122,233.94
-Caso 3 Faixa numerica,82428.131,3764.395,80550000,4552476,21.9
-Caso 4 Datas,94023.851,11562.333,80550000,15767605,8.13
-Caso 5 Textual,120267.516,1.674,80550000,0,71844.39
