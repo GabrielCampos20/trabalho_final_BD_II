@@ -5,7 +5,7 @@ services:
   configsvr:
     image: mongo:latest
     container_name: mongo-configsvr
-    command: mongod --configsvr --replSet configRS --port 27019 --bind_ip_all
+    command: mongod --configsvr --replSet configRS --port 27019 --bind_ip_all --wiredTigerCacheSizeGB 0.5
     ports:
       - 27019:27019
 
@@ -13,7 +13,7 @@ services:
   shard1:
     image: mongo:latest
     container_name: mongo-shard1
-    command: mongod --shardsvr --replSet shard1RS --port 27018 --bind_ip_all
+    command: mongod --shardsvr --replSet shard1RS --port 27018 --bind_ip_all --wiredTigerCacheSizeGB 1.5
     ports:
       - 27018:27018
 
@@ -21,7 +21,7 @@ services:
   shard2:
     image: mongo:latest
     container_name: mongo-shard2
-    command: mongod --shardsvr --replSet shard2RS --port 27020 --bind_ip_all
+    command: mongod --shardsvr --replSet shard2RS --port 27020 --bind_ip_all --wiredTigerCacheSizeGB 1.5
     ports:
       - 27020:27020
 

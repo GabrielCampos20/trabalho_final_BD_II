@@ -3,6 +3,8 @@ import os
 import time
 import random
 from datetime import datetime, timedelta
+import multiprocessing as mp
+from functools import partial
 
 import csv
 import numpy as np
@@ -12,12 +14,15 @@ from faker import Faker
 from tqdm import tqdm
 
 # -- Configuracao ----------------------------------------------------------------
+import faker
+import sys
 
-def carregar_config(caminho="config.json"):
-    with open(caminho, "r", encoding="utf-8") as f:
-        return json.load(f)
+# Adiciona a raiz do projeto ao path para importar modulos do src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from src.config_loader import config as CFG, PROJECT_ROOT, RESULTS_DIR
 
-CFG = carregar_config()
+fake = faker.Faker('pt_BR')
+Faker.seed(42)
 
 MONGO_URI  = CFG["mongodb"]["uri"]
 DB_NAME    = CFG["mongodb"]["database"]
@@ -31,7 +36,7 @@ BATCH_SIZE    = CFG["dataset"]["batch_size"]
 
 REPETICOES = CFG["experimentos"]["repeticoes"]
 
-OUTPUT_DIR = CFG["graficos"]["output_dir"]
+OUTPUT_DIR = RESULTS_DIR
 DPI        = CFG["graficos"]["dpi"]
 FORMATO    = CFG["graficos"]["formato"]
 
@@ -63,42 +68,90 @@ ESTADOS = [
     "RS", "RO", "RR", "SC", "SP", "SE", "TO"
 ]
 
-# -- Geracao de dados ------------------------------------------------------------
+# -- Geracao de dados Paralela (Mocks + Workers) ---------------------------------
 
-def gerar_usuario():
-    delta = DATA_FIM - DATA_INICIO
-    criado_em = DATA_INICIO + timedelta(days=random.randint(0, delta.days))
-    ultimo_acesso = criado_em + timedelta(days=random.randint(0, (DATA_FIM - criado_em).days))
+N_MOCKS = 10000
+MOCK_NOMES = [fake.name() for _ in range(N_MOCKS)]
+MOCK_EMAILS = [fake.email() for _ in range(N_MOCKS)]
+MOCK_CIDADES = [fake.city() for _ in range(1000)]
+MOCK_BIOS = [fake.text(max_nb_chars=150) for _ in range(1000)]
+MOCK_PROFISSOES = [fake.job() for _ in range(200)]
+MOCK_DATAS = [fake.date_time_between(start_date="-5y", end_date="now") for _ in range(N_MOCKS)]
+
+def _worker_inserir(batch_index, batch_size, total_batches, uri, db_name, col_name, seed):
+    np.random.seed(seed + batch_index)
+    import random
+    random.seed(seed + batch_index)
+    
+    client = MongoClient(uri)
+    col = client[db_name][col_name]
+    
+    lote = []
+    for _ in range(batch_size):
+        lote.append({
+            "nome": random.choice(MOCK_NOMES),
+            "email": random.choice(MOCK_EMAILS),
+            "idade": random.randint(18, 80),
+            "cidade": random.choice(MOCK_CIDADES),
+            "estado": random.choice(ESTADOS),
+            "profissao": random.choice(MOCK_PROFISSOES),
+            "salario": round(random.uniform(1000.0, 25000.0), 2),
+            "ativo": random.choice([True, False]),
+            "criado_em": random.choice(MOCK_DATAS),
+            "bio": random.choice(MOCK_BIOS)
+        })
+    col.insert_many(lote, ordered=False)
+    client.close()
+    return batch_size
+
+def popular_banco(col, db):
+    db_name = db.name
+    col_name = col.name
+    
+    # Criar collection SEM compressao Snappy para gerar peso real
+    if col_name not in db.list_collection_names():
+        try:
+            db.create_collection(col_name, storageEngine={"wiredTiger": {"configString": "block_compressor=none"}})
+            print("[Info] Collection criada com Compressao Snappy DESATIVADA.")
+        except Exception as e:
+            print(f"[Aviso] Nao foi possivel desativar compressao (falta config server ou engine?): {e}")
+
+    batch_s = 50000
+    total_batches = (TAMANHO // batch_s) + 1
+    
+    print(f"\n[Dataset] Alvo de Big Data: {TAMANHO_GB} GB (~{TAMANHO:,} documentos sem compressao)")
+    print(f"[Dataset] Iniciando {mp.cpu_count()} Workers em Paralelo...\n")
+    
+    func = partial(_worker_inserir, batch_size=batch_s, total_batches=total_batches, 
+                   uri=MONGO_URI, db_name=db_name, col_name=col_name, seed=SEED)
+                   
+    inseridos = 0
+    with mp.Pool(processes=mp.cpu_count()) as pool:
+        with tqdm(total=TAMANHO, desc="Inserindo (Paralelo)", unit="docs") as barra:
+            for docs_in_batch in pool.imap_unordered(func, range(total_batches)):
+                inseridos += docs_in_batch
+                barra.update(docs_in_batch)
+                if inseridos >= TAMANHO:
+                    break
+    print(f"\n[Dataset] {TAMANHO:,} documentos brutos inseridos com sucesso.\n")
+
+def gerar_usuario(): # Preservado para Caso 6
+    c_em = random.choice(MOCK_DATAS)
     return {
-        "nome":          fake.name(),
-        "email":         fake.email(),
-        "idade":         random.randint(IDADE_MIN, IDADE_MAX),
-        "cidade":        fake.city(),
-        "estado":        random.choice(ESTADOS),
-        "profissao":     random.choice(PROFISSOES),
-        "salario":       round(random.uniform(SAL_MIN, SAL_MAX), 2),
-        "ativo":         random.choice([True, False]),
-        "criado_em":     criado_em,
-        "ultimo_acesso": ultimo_acesso,
+        "nome": random.choice(MOCK_NOMES),
+        "email": random.choice(MOCK_EMAILS),
+        "idade": random.randint(18, 80),
+        "cidade": random.choice(MOCK_CIDADES),
+        "estado": random.choice(ESTADOS),
+        "profissao": random.choice(MOCK_PROFISSOES),
+        "salario": round(random.uniform(1000.0, 25000.0), 2),
+        "ativo": random.choice([True, False]),
+        "criado_em": c_em,
+        "bio": random.choice(MOCK_BIOS)
     }
 
-def popular_banco(col):
-    print(f"\n[Dataset] Alvo: {TAMANHO_GB} GB (~{TAMANHO:,} documentos)")
-    print(f"[Dataset] Ranges desta execucao:")
-    print(f"  Salario:  R$ {SAL_MIN:,.2f} - R$ {SAL_MAX:,.2f}")
-    print(f"  Idade:    {IDADE_MIN} - {IDADE_MAX} anos")
-    print(f"  Datas:    {DATA_INICIO.year} - {DATA_FIM.year}")
-    print(f"\n[Dataset] Inserindo em lotes de {BATCH_SIZE:,}...\n")
-    col.drop()
-    total = 0
-    with tqdm(total=TAMANHO, unit="docs") as barra:
-        while total < TAMANHO:
-            lote = min(BATCH_SIZE, TAMANHO - total)
-            docs = [gerar_usuario() for _ in range(lote)]
-            col.insert_many(docs)
-            total += lote
-            barra.update(lote)
-    print(f"\n[Dataset] {TAMANHO:,} documentos inseridos com sucesso.\n")
+
+
 
 # -- Utilitarios -----------------------------------------------------------------
 
@@ -108,12 +161,12 @@ def remover_indices(col):
             col.drop_index(idx)
 
 def medir_query(col, filtro, repeticoes=REPETICOES, barra=None):
-    # Warm-up de cache
-    list(col.find(filtro))
+    # Warm-up de cache (substituindo list() pelo count_documents para salvar RAM)
+    col.count_documents(filtro)
     tempos = []
     for _ in range(repeticoes):
         inicio = time.perf_counter()
-        list(col.find(filtro))
+        col.count_documents(filtro)
         tempos.append((time.perf_counter() - inicio) * 1000)
         if barra:
             barra.update(1)
@@ -664,20 +717,19 @@ def exportar_csv(resultados):
 
 
 def gerar_todos_graficos(resultados):
+    import subprocess
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(os.path.join(OUTPUT_DIR, "graficos"), exist_ok=True)
-    os.makedirs(os.path.join(OUTPUT_DIR, "latex"), exist_ok=True)
     os.makedirs(os.path.join(OUTPUT_DIR, "csv"), exist_ok=True)
-    print("\n[Graficos] Gerando conjunto completo...")
-    grafico_comparacao_geral(resultados)
-    grafico_docs_examinados(resultados)
-    grafico_speedup(resultados)
-    grafico_boxplot_estabilidade(resultados)
-    grafico_penalidade_escrita(resultados)
-    grafico_overhead_armazenamento(resultados)
-    exportar_latex(resultados)
+    
     exportar_csv(resultados)
-    print(f"[Graficos] Todos os graficos salvos em '{OUTPUT_DIR}/'")
+
+    log_header("GERANDO GRAFICOS PADRONIZADOS VIA PLOTAR_GRAFICOS.PY")
+    try:
+        script_graficos = os.path.join(PROJECT_ROOT, "src", "utils", "plotar_graficos.py")
+        subprocess.run([sys.executable, script_graficos], check=True)
+        print("\n[SUCESSO] Graficos gerados na pasta 'resultados/graficos_revisados'.")
+    except Exception as e:
+        print(f"\n[ERRO] Falha ao executar plotar_graficos.py: {e}")
 
 
 # -- Main ------------------------------------------------------------------------
@@ -732,8 +784,15 @@ def main():
     db     = client[DB_NAME]
     col    = db[COL_NAME]
 
+    if DB_NAME in client.list_database_names() and col.count_documents({}) > 0:
+        log_header(f"[Setup] Banco pre-existente '{DB_NAME}' detectado. Excluindo por inteiro...")
+        client.drop_database(DB_NAME)
+        # Recria as variaveis pois o db sumiu
+        db  = client[DB_NAME]
+        col = db[COL_NAME]
+
     if col.count_documents({}) < TAMANHO:
-        popular_banco(col)
+        popular_banco(col, db)
     else:
         log_header(f"[Dataset] Collection ja possui {col.count_documents({}):,} documentos. Pulando insercao.")
 
@@ -758,7 +817,7 @@ def main():
 
     print("\n[Info] Gerando graficos...")
     gerar_todos_graficos(resultados)
-    print("\n[Info] Excluindo banco de dados (1 GB) para liberar espaco no disco...")
+    print("\n[Info] Excluindo banco de dados para liberar espaco no disco...")
     client.drop_database(DB_NAME)
     print("=== Experimentos concluidos ===\n")
     client.close()

@@ -15,9 +15,9 @@ __pycache__/
 *.swp
 *.swo
 
-# Resultados gerados pelos experimentos
+# Resultados gerados pelos experimentos (mas mantém a estrutura da pasta)
 resultados/*
-
+!resultados/.gitkeep
 # Arquivos de sistema operacional
 .DS_Store
 Thumbs.db

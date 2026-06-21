@@ -44,12 +44,23 @@ pip install -r requirements.txt
 
 ---
 
-## 🚀 Como Executar: Estudo de Caso 1 (Isolado)
+## 🎮 CLI Interativa (Menu Principal)
+
+Para facilitar a orquestração e execução de todos os testes de forma interativa, criei um script central na raiz do projeto. 
+Com o seu ambiente virtual ativado, basta rodar:
+```bash
+python main.py
+```
+Isso abrirá um menu no terminal onde você pode escolher rodar o ambiente isolado, o distribuído (que sobe os Dockers automaticamente), limpar tudo, ou rodar a bateria completa em sequência!
+
+---
+
+## 🚀 Como Executar Manualmente: Estudo de Caso 1 (Isolado)
 
 Este caso mede Otimização e Índices. Ele pressupõe que você tenha um MongoDB local simples rodando na porta 27017.
 
 ```bash
-python caso_isolado.py
+python -m src.experimentos.caso_isolado
 ```
 > O script cuidará de inserir os dados, rodar todos os comparativos, dropar o banco no final e salvar as planilhas/gráficos na pasta `resultados/`.
 
@@ -61,22 +72,30 @@ Este caso mede particionamento e overhead de rede.
 
 **Passo 1: Subir o Cluster Local**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 > Isso levantará 4 containers: 1 Servidor de Configuração, 2 Shards de Dados e 1 Mongos Router (porta 27017).
 
 **Passo 2: Configurar a Inteligência do Cluster**
 Aguarde alguns segundos após o comando anterior e execute o inicializador:
 ```bash
-python scripts/init_cluster.py
+python -m src.infra.init_cluster
 ```
 > O script Python vai conversar com os containers, eleger os líderes e configurar o campo `"estado"` como sendo a nossa *Shard Key* oficial.
 
 **Passo 3: Rodar o Experimento**
 ```bash
-python caso_distribuido.py
+python -m src.experimentos.caso_distribuido
 ```
-> Agora o Python se conecta ao Roteador. Ele vai disparar consultas direcionadas e varreduras de difusão na rede distribuída. Todos os resultados irão automaticamente para a pasta `resultados/`.
+> Agora o Python se conecta ao Roteador. Ele vai disparar consultas direcionadas e varreduras de difusão na rede distribuída. Todos os resultados irão automaticamente para a pasta `resultados/distributed/`.
+
+---
+
+## 🧹 Limpeza do Ambiente
+Caso precise abortar a execução ou resetar completamente seu Docker e banco local:
+```bash
+sudo python -m src.utils.limpar_ambiente
+```
 
 ---
 
