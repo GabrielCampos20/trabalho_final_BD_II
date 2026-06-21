@@ -19,7 +19,7 @@ import sys
 
 # Adiciona a raiz do projeto ao path para importar modulos do src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.config_loader import config as CFG, PROJECT_ROOT, RESULTS_DIR
+from src.config_loader import config as CFG, PROJECT_ROOT, ISOLATED_RESULTS_DIR
 
 fake = faker.Faker('pt_BR')
 Faker.seed(42)
@@ -36,7 +36,8 @@ BATCH_SIZE    = CFG["dataset"]["batch_size"]
 
 REPETICOES = CFG["experimentos"]["repeticoes"]
 
-OUTPUT_DIR = RESULTS_DIR
+OUTPUT_DIR = ISOLATED_RESULTS_DIR
+DIR_CSV = os.path.join(OUTPUT_DIR, "csv")
 DPI        = CFG["graficos"]["dpi"]
 FORMATO    = CFG["graficos"]["formato"]
 
@@ -428,249 +429,11 @@ COR_COM   = "#1976D2"
 COR_SPEED = "#388E3C"
 
 
-def _salvar(fig, nome):
-    caminho = os.path.join(OUTPUT_DIR, "graficos", f"{nome}.{FORMATO}")
-    fig.savefig(caminho, dpi=DPI, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  -> {caminho}")
-
-
-def grafico_comparacao_geral(resultados):
-    """Barras agrupadas: tempo medio com vs sem indice para todos os casos."""
-    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
-    medias_sem = [resumo_estatistico(resultados[c]["sem_indice"])["media"] for c in casos]
-    medias_com = [resumo_estatistico(resultados[c]["com_indice"])["media"] for c in casos]
-    erros_sem  = [resumo_estatistico(resultados[c]["sem_indice"])["desvio_pad"] for c in casos]
-    erros_com  = [resumo_estatistico(resultados[c]["com_indice"])["desvio_pad"] for c in casos]
-
-    x, w = np.arange(len(casos)), 0.35
-    fig, ax = plt.subplots(figsize=(12, 6))
-    b1 = ax.bar(x - w/2, medias_sem, w, yerr=erros_sem, label="Sem indice",
-                color=COR_SEM, capsize=5, error_kw={"elinewidth": 1.5})
-    b2 = ax.bar(x + w/2, medias_com, w, yerr=erros_com, label="Com indice",
-                color=COR_COM, capsize=5, error_kw={"elinewidth": 1.5})
-    for b in list(b1) + list(b2):
-        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.3,
-                f"{b.get_height():.1f}", ha="center", va="bottom", fontsize=8)
-    ax.set_xlabel("Caso de Uso", fontsize=12)
-    ax.set_ylabel("Tempo medio (ms)", fontsize=12)
-    ax.set_title("Visao Geral - Tempo Medio por Caso de Uso", fontsize=14)
-    ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
-    ax.legend(fontsize=11)
-    plt.tight_layout()
-    _salvar(fig, "01_comparacao_geral")
-
-
-def graficos_por_caso(resultados):
-    """Um grafico de barras individual para cada caso de uso."""
-    for i, (caso, dados) in enumerate(resultados.items(), 1):
-        if "Caso 6" in caso: continue
-        est_sem = resumo_estatistico(dados["sem_indice"])
-        est_com = resumo_estatistico(dados["com_indice"])
-        categorias = ["Sem indice", "Com indice"]
-        medias = [est_sem["media"], est_com["media"]]
-        erros  = [est_sem["desvio_pad"], est_com["desvio_pad"]]
-        cores  = [COR_SEM, COR_COM]
-
-        fig, ax = plt.subplots(figsize=(7, 5))
-        bars = ax.bar(categorias, medias, yerr=erros, color=cores,
-                      capsize=6, error_kw={"elinewidth": 1.5}, width=0.4)
-        for b in bars:
-            ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.3,
-                    f"{b.get_height():.2f} ms", ha="center", va="bottom", fontsize=10)
-        titulo = caso.replace("\n", " - ")
-        ax.set_title(f"Tempo Medio - {titulo}", fontsize=13)
-        ax.set_ylabel("Tempo medio (ms)", fontsize=11)
-        plt.tight_layout()
-        _salvar(fig, f"02_caso_{i}_tempo")
-
-
-def grafico_docs_examinados(resultados):
-    """Barras agrupadas: documentos examinados com vs sem indice."""
-    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
-    docs_sem = [resultados[c]["exp_sem"]["totalDocsExamined"] for c in casos]
-    docs_com = [resultados[c]["exp_com"]["totalDocsExamined"] for c in casos]
-
-    x, w = np.arange(len(casos)), 0.35
-    fig, ax = plt.subplots(figsize=(12, 6))
-    b1 = ax.bar(x - w/2, docs_sem, w, label="Sem indice", color=COR_SEM)
-    b2 = ax.bar(x + w/2, docs_com, w, label="Com indice", color=COR_COM)
-    for b in list(b1) + list(b2):
-        ax.text(b.get_x() + b.get_width()/2, b.get_height() + max(docs_sem) * 0.01,
-                f"{int(b.get_height()):,}", ha="center", va="bottom", fontsize=7, rotation=30)
-    ax.set_xlabel("Caso de Uso", fontsize=12)
-    ax.set_ylabel("Documentos Examinados", fontsize=12)
-    ax.set_title("Documentos Examinados pelo MongoDB - Com vs Sem Indice", fontsize=14)
-    ax.set_xticks(x); ax.set_xticklabels(casos, rotation=15, ha="right", fontsize=9)
-    ax.legend(fontsize=11)
-    plt.tight_layout()
-    _salvar(fig, "03_docs_examinados")
-
-
-def grafico_speedup(resultados):
-    """Barras horizontais: fator de aceleracao (speedup) do indice por caso."""
-    casos      = [c for c in resultados.keys() if "Caso 6" not in c]
-    speedup = []
-    for c in casos:
-        media_sem = resumo_estatistico(resultados[c]["sem_indice"])["media"]
-        media_com = resumo_estatistico(resultados[c]["com_indice"])["media"]
-        speedup.append(round(media_sem / media_com, 2) if media_com > 0 else 0)
-
-    fig, ax = plt.subplots(figsize=(9, 6))
-    bars = ax.barh(casos, speedup, color=COR_SPEED, edgecolor="white")
-    
-    # Usar escala logarítmica para impedir que speedups gigantes engulam os menores
-    ax.set_xscale("log")
-    ax.set_xlim(left=0.5) # Iniciar um pouco antes do 1x para nao cortar
-    
-    ax.axvline(x=1, color=COR_SEM, linestyle="--", linewidth=1, label="Sem ganho (1x)")
-    for b, v in zip(bars, speedup):
-        offset = v * 1.15 if v > 0 else 1.15
-        ax.text(offset, b.get_y() + b.get_height()/2,
-                f"{v:.2f}x", va="center", fontsize=10, fontweight="bold")
-    ax.set_xlabel("Speedup (Escala Logarítmica - vezes mais rápido)", fontsize=11)
-    ax.set_title("Fator de Aceleração por Uso de Índice", fontsize=14)
-    ax.legend(fontsize=10)
-    plt.tight_layout()
-    _salvar(fig, "04_speedup")
-
-
-
-
-
-def grafico_boxplot_estabilidade(resultados):
-    """Boxplot para mostrar a variancia dos tempos (com vs sem indice)."""
-    casos = [c for c in resultados.keys() if "Caso 6" not in c]
-    dados_sem = [resultados[c]["sem_indice"] for c in casos]
-    dados_com = [resultados[c]["com_indice"] for c in casos]
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    pos_sem = np.arange(len(casos)) * 2.0 - 0.4
-    pos_com = np.arange(len(casos)) * 2.0 + 0.4
-    
-    bp_sem = ax.boxplot(dados_sem, positions=pos_sem, widths=0.6, patch_artist=True)
-    bp_com = ax.boxplot(dados_com, positions=pos_com, widths=0.6, patch_artist=True)
-    
-    for patch in bp_sem['boxes']:
-        patch.set_facecolor(COR_SEM)
-        patch.set_alpha(0.7)
-    for patch in bp_com['boxes']:
-        patch.set_facecolor(COR_COM)
-        patch.set_alpha(0.7)
-        
-    for median in bp_sem['medians']: median.set_color('black')
-    for median in bp_com['medians']: median.set_color('black')
-        
-    ax.set_xticks(np.arange(len(casos)) * 2.0)
-    ax.set_xticklabels([c.replace('\n', ' ') for c in casos], rotation=15, ha="right", fontsize=9)
-    ax.set_ylabel("Tempo de Execucao (ms) - Escala Log", fontsize=11)
-    ax.set_yscale("log")
-    ax.set_title("Estabilidade das Consultas (Boxplot das Repeticoes)", fontsize=14)
-    
-    from matplotlib.patches import Patch
-    legend_elements = [Patch(facecolor=COR_SEM, label='Sem Indice', alpha=0.7),
-                       Patch(facecolor=COR_COM, label='Com Indice', alpha=0.7)]
-    ax.legend(handles=legend_elements, fontsize=11)
-    plt.tight_layout()
-    _salvar(fig, "05_boxplot_estabilidade")
-
-
-def grafico_penalidade_escrita(resultados):
-    """Bar chart do tempo de insercao."""
-    chave_c6 = next((k for k in resultados.keys() if "Caso 6" in k), None)
-    if not chave_c6: return
-    
-    dados = resultados[chave_c6]
-    t_sem = resumo_estatistico(dados["sem_indice"])["media"]
-    t_com = resumo_estatistico(dados["com_indice"])["media"]
-    
-    fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(["Sem indices extras", "Com todos os indices"], [t_sem, t_com], color=[COR_SEM, COR_COM], width=0.5)
-    for b in bars:
-        ax.text(b.get_x() + b.get_width()/2, b.get_height() + (max(t_sem, t_com) * 0.02),
-                f"{b.get_height():.1f} ms", ha="center", va="bottom", fontsize=11, fontweight="bold")
-    ax.set_ylabel("Tempo Medio de Insercao Lote (ms)", fontsize=11)
-    ax.set_title("Penalidade de Escrita (Trade-off de Indices)", fontsize=13)
-    plt.tight_layout()
-    _salvar(fig, "06_penalidade_escrita")
-
-
-def grafico_overhead_armazenamento(resultados):
-    """Bar chart comparando o tamanho dos indices."""
-    chave_c6 = next((k for k in resultados.keys() if "Caso 6" in k), None)
-    if not chave_c6: return
-    
-    dados = resultados[chave_c6]
-    tam_sem = dados["tamanho_index_sem_mb"]
-    tam_com = dados["tamanho_index_com_mb"]
-    
-    fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(["Apenas _id padrao", "Todos os Indices"], [tam_sem, tam_com], color=[COR_SEM, COR_COM], width=0.5)
-    for b in bars:
-        ax.text(b.get_x() + b.get_width()/2, b.get_height() + (max(tam_sem, tam_com) * 0.02),
-                f"{b.get_height():.1f} MB", ha="center", va="bottom", fontsize=11, fontweight="bold")
-    ax.set_ylabel("Espaco em Disco Ocupado (MB)", fontsize=11)
-    ax.set_title("Overhead de Armazenamento (Tamanho dos Indices)", fontsize=13)
-    plt.tight_layout()
-    _salvar(fig, "07_overhead_armazenamento")
-
-
-def exportar_latex(resultados):
-    linhas = []
-    linhas.append("\\begin{table}[htpb]")
-    linhas.append("\\centering")
-    linhas.append("\\caption{Comparativo de Desempenho e Documentos Examinados}")
-    linhas.append("\\label{tab:resultados}")
-    linhas.append("\\begin{tabular}{l|rr|rr|r}")
-    linhas.append("\\hline")
-    linhas.append("\\textbf{Caso de Uso} & \\textbf{Tempo sem Índice (ms)} & \\textbf{Docs. Examinados (Sem)} & \\textbf{Tempo com Índice (ms)} & \\textbf{Docs. Examinados (Com)} & \\textbf{Fator de Aceleração (Speedup)} \\\\")
-    linhas.append("\\hline")
-    
-    for nome, dados in resultados.items():
-        if "Caso 6" in nome: continue
-        t_sem = resumo_estatistico(dados["sem_indice"])["media"]
-        t_com = resumo_estatistico(dados["com_indice"])["media"]
-        docs_sem = dados["exp_sem"]["totalDocsExamined"]
-        docs_com = dados["exp_com"]["totalDocsExamined"]
-        speedup = round(t_sem / t_com, 2) if t_com > 0 else 0
-        nome_limpo = nome.replace("\n", " ")
-        linhas.append(f"{nome_limpo} & {t_sem:.2f} & {docs_sem:,} & {t_com:.2f} & {docs_com:,} & {speedup}x \\\\")
-        
-    linhas.append("\\hline")
-    linhas.append("\\end{tabular}")
-    linhas.append("\\end{table}")
-    
-    if any("Caso 6" in k for k in resultados.keys()):
-        for nome, dados in resultados.items():
-            if "Caso 6" in nome:
-                linhas.append("\n\\begin{table}[htpb]")
-                linhas.append("\\centering")
-                linhas.append("\\caption{Impacto dos Índices no Armazenamento e Inserção}")
-                linhas.append("\\label{tab:impacto_indices}")
-                linhas.append("\\begin{tabular}{l|rr}")
-                linhas.append("\\hline")
-                linhas.append("\\textbf{Cenário} & \\textbf{Tamanho dos Índices (MB)} & \\textbf{Tempo de Inserção (ms)} \\\\")
-                linhas.append("\\hline")
-                t_sem = resumo_estatistico(dados["sem_indice"])["media"]
-                t_com = resumo_estatistico(dados["com_indice"])["media"]
-                tam_sem = dados["tamanho_index_sem_mb"]
-                tam_com = dados["tamanho_index_com_mb"]
-                linhas.append(f"Sem Índices & {tam_sem:.2f} & {t_sem:.2f} \\\\")
-                linhas.append(f"Com Todos os Índices & {tam_com:.2f} & {t_com:.2f} \\\\")
-                linhas.append("\\hline")
-                linhas.append("\\end{tabular}")
-                linhas.append("\\end{table}")
-                
-    caminho = os.path.join(OUTPUT_DIR, "latex", "tabelas.tex")
-    with open(caminho, "w", encoding="utf-8") as f:
-        f.write("\n".join(linhas))
-    print(f"  -> {caminho}")
-
-
 def exportar_csv(resultados):
+    import csv
     # 1. Agregado Consultas (Medias)
-    caminho_agregado = os.path.join(OUTPUT_DIR, "csv", "consultas_agregado.csv")
-    with open(caminho_agregado, mode="w", newline="", encoding="utf-8") as f:
+    arquivo_agregado = os.path.join(ISOLATED_RESULTS_DIR, "csv", "consultas_agregado.csv")
+    with open(arquivo_agregado, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(["Caso de Uso", "Tempo Medio Sem Indice (ms)", "Tempo Medio Com Indice (ms)", "Docs Sem Indice", "Docs Com Indice", "Speedup"])
         casos = [c for c in resultados.keys() if "Caso 6" not in c]
@@ -683,11 +446,11 @@ def exportar_csv(resultados):
             speedup = round(t_sem / t_com, 2) if t_com > 0 else 0
             nome_limpo = nome.replace("\n", " ")
             writer.writerow([nome_limpo, t_sem, t_com, docs_sem, docs_com, speedup])
-    print(f"  -> {caminho_agregado}")
+    print(f"  -> {arquivo_agregado}")
 
     # 2. Bruto Consultas (Todas as execucoes)
-    caminho_bruto = os.path.join(OUTPUT_DIR, "csv", "consultas_bruto.csv")
-    with open(caminho_bruto, mode="w", newline="", encoding="utf-8") as f:
+    arquivo_bruto = os.path.join(ISOLATED_RESULTS_DIR, "csv", "consultas_bruto.csv")
+    with open(arquivo_bruto, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(["Caso de Uso", "Cenario", "Repeticao", "Tempo (ms)"])
         for nome in casos:
@@ -697,12 +460,12 @@ def exportar_csv(resultados):
                 writer.writerow([nome_limpo, "Sem Indice", i + 1, round(t, 3)])
             for i, t in enumerate(dados["com_indice"]):
                 writer.writerow([nome_limpo, "Com Indice", i + 1, round(t, 3)])
-    print(f"  -> {caminho_bruto}")
+    print(f"  -> {arquivo_bruto}")
 
     # 3. Caso 6 (Escrita e Armazenamento)
     if any("Caso 6" in k for k in resultados.keys()):
-        caminho_escrita = os.path.join(OUTPUT_DIR, "csv", "escrita_armazenamento.csv")
-        with open(caminho_escrita, mode="w", newline="", encoding="utf-8") as f:
+        arquivo_escrita = os.path.join(ISOLATED_RESULTS_DIR, "csv", "escrita_armazenamento.csv")
+        with open(arquivo_escrita, mode='w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(["Cenario", "Tamanho dos Indices (MB)", "Tempo Medio de Insercao (ms)"])
             for nome, dados in resultados.items():
@@ -719,17 +482,17 @@ def exportar_csv(resultados):
 def gerar_todos_graficos(resultados):
     import subprocess
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(os.path.join(OUTPUT_DIR, "csv"), exist_ok=True)
+    os.makedirs(DIR_CSV, exist_ok=True)
     
     exportar_csv(resultados)
 
-    log_header("GERANDO GRAFICOS PADRONIZADOS VIA PLOTAR_GRAFICOS.PY")
+    log_header("GERANDO GRAFICOS PADRONIZADOS VIA PLOTAR_ISOLADO.PY")
     try:
-        script_graficos = os.path.join(PROJECT_ROOT, "src", "utils", "plotar_graficos.py")
+        script_graficos = os.path.join(PROJECT_ROOT, "src", "utils", "plotar_isolado.py")
         subprocess.run([sys.executable, script_graficos], check=True)
-        print("\n[SUCESSO] Graficos gerados na pasta 'resultados/graficos_revisados'.")
+        print("\n[SUCESSO] Graficos gerados na pasta 'results/isolated/graficos'.")
     except Exception as e:
-        print(f"\n[ERRO] Falha ao executar plotar_graficos.py: {e}")
+        print(f"\n[ERRO] Falha ao executar plotar_isolado.py: {e}")
 
 
 # -- Main ------------------------------------------------------------------------

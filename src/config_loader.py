@@ -19,5 +19,7 @@ def load_config():
 
 # Global variables ready for import
 config = load_config()
-RESULTS_DIR = os.path.join(PROJECT_ROOT, "resultados")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
+ISOLATED_RESULTS_DIR = os.path.join(RESULTS_DIR, "isolated")
 DISTRIBUTED_RESULTS_DIR = os.path.join(RESULTS_DIR, "distributed")
+OPTIMIZED_RESULTS_DIR = os.path.join(RESULTS_DIR, "optimized")

@@ -1,0 +1,94 @@
+{
+    "explainVersion": "1",
+    "queryPlanner": {
+        "namespace": "bd2_experimentos.usuarios",
+        "parsedQuery": {
+            "profissao": {
+                "$regex": "Analista",
+                "$options": "i"
+            }
+        },
+        "indexFilterSet": false,
+        "queryHash": "37178109",
+        "planCacheShapeHash": "37178109",
+        "planCacheKey": "FE2AF32E",
+        "optimizationTimeMillis": 0,
+        "maxIndexedOrSolutionsReached": false,
+        "maxIndexedAndSolutionsReached": false,
+        "maxScansToExplodeReached": false,
+        "prunedSimilarIndexes": false,
+        "winningPlan": {
+            "isCached": false,
+            "stage": "COLLSCAN",
+            "filter": {
+                "profissao": {
+                    "$regex": "Analista",
+                    "$options": "i"
+                }
+            },
+            "nss": "bd2_experimentos.usuarios",
+            "direction": "forward"
+        },
+        "rejectedPlans": []
+    },
+    "executionStats": {
+        "executionSuccess": true,
+        "nReturned": 0,
+        "executionTimeMillis": 93216,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 80550000,
+        "executionStages": {
+            "isCached": false,
+            "stage": "COLLSCAN",
+            "filter": {
+                "profissao": {
+                    "$regex": "Analista",
+                    "$options": "i"
+                }
+            },
+            "nReturned": 0,
+            "executionTimeMillisEstimate": 90989,
+            "works": 80550001,
+            "advanced": 0,
+            "needTime": 80550000,
+            "needYield": 0,
+            "saveState": 4841,
+            "restoreState": 4841,
+            "isEOF": 1,
+            "nss": "bd2_experimentos.usuarios",
+            "direction": "forward",
+            "docsExamined": 80550000
+        },
+        "allPlansExecution": []
+    },
+    "queryShapeHash": "41A104426890D835DCB9FCF4CE3FD754A6F520145FBC3BBA1C9EC7300AA6E749",
+    "command": {
+        "find": "usuarios",
+        "filter": {
+            "profissao": {
+                "$regex": "Analista",
+                "$options": "i"
+            }
+        },
+        "$db": "bd2_experimentos"
+    },
+    "serverInfo": {
+        "host": "merlin",
+        "port": 27017,
+        "version": "8.3.2",
+        "gitVersion": "89f54eb32e217d2f7bfcad50e5919f3033bb9611"
+    },
+    "serverParameters": {
+        "internalQueryFacetBufferSizeBytes": 104857600,
+        "internalDocumentSourceGroupMaxMemoryBytes": 104857600,
+        "internalQueryMaxBlockingSortMemoryUsageBytes": 104857600,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes": 104857600,
+        "internalQueryFacetMaxOutputDocSizeBytes": 104857600,
+        "internalLookupStageIntermediateDocumentMaxSizeBytes": 104857600,
+        "internalQueryProhibitBlockingMergeOnMongoS": 0,
+        "internalQueryMaxAddToSetBytes": 104857600,
+        "internalQueryFrameworkControl": "trySbeRestricted",
+        "internalQueryPlannerIgnoreIndexWithCollationForRegex": 1
+    },
+    "ok": 1.0
+}

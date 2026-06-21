@@ -731,13 +731,13 @@ def gerar_todos_graficos(resultados):
     
     exportar_csv(resultados)
 
-    log_header("GERANDO GRAFICOS PADRONIZADOS VIA PLOTAR_GRAFICOS.PY")
+    log_header("GERANDO GRAFICOS PADRONIZADOS VIA PLOTAR_DISTRIBUIDO.PY")
     try:
-        script_graficos = os.path.join(PROJECT_ROOT, "src", "utils", "plotar_graficos.py")
-        subprocess.run([sys.executable, script_graficos, "--distribuido"], check=True)
-        print("\n[SUCESSO] Graficos gerados na pasta 'resultados/distributed/graficos_revisados'.")
+        script_graficos = os.path.join(PROJECT_ROOT, "src", "utils", "plotar_distribuido.py")
+        subprocess.run([sys.executable, script_graficos], check=True)
+        print("\n[SUCESSO] Graficos gerados na pasta 'results/distributed/graficos'.")
     except Exception as e:
-        print(f"\n[ERRO] Falha ao executar plotar_graficos.py: {e}")
+        print(f"\n[ERRO] Falha ao executar plotar_distribuido.py: {e}")
 
 
 # -- Main ------------------------------------------------------------------------

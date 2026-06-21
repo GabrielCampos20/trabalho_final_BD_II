@@ -1,0 +1,186 @@
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "SINGLE_SHARD",
+      "shards": [
+        {
+          "explainVersion": "1",
+          "shardName": "shard1RS",
+          "connectionString": "shard1RS/shard1:27018",
+          "serverInfo": {
+            "host": "c111a626d927",
+            "port": 27018,
+            "version": "8.2.11",
+            "gitVersion": "ee01d36638a00a07a6aa42ee80a125890f11aeed"
+          },
+          "namespace": "bd2_experimentos.usuarios",
+          "parsedQuery": {
+            "estado": {
+              "$eq": "AC"
+            }
+          },
+          "indexFilterSet": false,
+          "queryHash": "B2FC0DB4",
+          "planCacheShapeHash": "B2FC0DB4",
+          "planCacheKey": "EB479336",
+          "optimizationTimeMillis": 0,
+          "maxIndexedOrSolutionsReached": false,
+          "maxIndexedAndSolutionsReached": false,
+          "maxScansToExplodeReached": false,
+          "prunedSimilarIndexes": false,
+          "winningPlan": {
+            "isCached": false,
+            "stage": "FETCH",
+            "inputStage": {
+              "stage": "IXSCAN",
+              "keyPattern": {
+                "estado": 1
+              },
+              "indexName": "estado_1",
+              "isMultiKey": false,
+              "multiKeyPaths": {
+                "estado": []
+              },
+              "isUnique": false,
+              "isSparse": false,
+              "isPartial": false,
+              "indexVersion": 2,
+              "direction": "forward",
+              "indexBounds": {
+                "estado": [
+                  "[\"AC\", \"AC\"]"
+                ]
+              }
+            }
+          },
+          "rejectedPlans": []
+        }
+      ]
+    }
+  },
+  "executionStats": {
+    "nReturned": 7321314,
+    "executionTimeMillis": 94817,
+    "totalKeysExamined": 7321314,
+    "totalDocsExamined": 7321314,
+    "executionStages": {
+      "stage": "SINGLE_SHARD",
+      "nReturned": 7321314,
+      "executionTimeMillis": 94817,
+      "totalKeysExamined": 7321314,
+      "totalDocsExamined": 7321314,
+      "totalChildMillis": 94816,
+      "shards": [
+        {
+          "shardName": "shard1RS",
+          "executionSuccess": true,
+          "nReturned": 7321314,
+          "executionTimeMillis": 94816,
+          "totalKeysExamined": 7321314,
+          "totalDocsExamined": 7321314,
+          "executionStages": {
+            "isCached": false,
+            "stage": "FETCH",
+            "nReturned": 7321314,
+            "executionTimeMillisEstimate": 91518,
+            "works": 7321315,
+            "advanced": 7321314,
+            "needTime": 0,
+            "needYield": 0,
+            "saveState": 5037,
+            "restoreState": 5037,
+            "isEOF": 1,
+            "docsExamined": 7321314,
+            "alreadyHasObj": 0,
+            "inputStage": {
+              "stage": "IXSCAN",
+              "nReturned": 7321314,
+              "executionTimeMillisEstimate": 11521,
+              "works": 7321315,
+              "advanced": 7321314,
+              "needTime": 0,
+              "needYield": 0,
+              "saveState": 5037,
+              "restoreState": 5037,
+              "isEOF": 1,
+              "keyPattern": {
+                "estado": 1
+              },
+              "indexName": "estado_1",
+              "isMultiKey": false,
+              "multiKeyPaths": {
+                "estado": []
+              },
+              "isUnique": false,
+              "isSparse": false,
+              "isPartial": false,
+              "indexVersion": 2,
+              "direction": "forward",
+              "indexBounds": {
+                "estado": [
+                  "[\"AC\", \"AC\"]"
+                ]
+              },
+              "keysExamined": 7321314,
+              "seeks": 1,
+              "dupsTested": 0,
+              "dupsDropped": 0
+            }
+          },
+          "allPlansExecution": []
+        }
+      ]
+    },
+    "allPlansExecution": [
+      {
+        "shardName": "shard1RS",
+        "allPlans": []
+      }
+    ]
+  },
+  "queryShapeHash": "E3418760CA1959D2F8788404F411F95555256F329C8825FBAADD76AF49F4B0D6",
+  "serverInfo": {
+    "host": "c87d49df2796",
+    "port": 27017,
+    "version": "8.2.11",
+    "gitVersion": "ee01d36638a00a07a6aa42ee80a125890f11aeed"
+  },
+  "serverParameters": {
+    "internalQueryFacetBufferSizeBytes": 104857600,
+    "internalQueryFacetMaxOutputDocSizeBytes": 104857600,
+    "internalLookupStageIntermediateDocumentMaxSizeBytes": 104857600,
+    "internalDocumentSourceGroupMaxMemoryBytes": 104857600,
+    "internalQueryMaxBlockingSortMemoryUsageBytes": 104857600,
+    "internalQueryProhibitBlockingMergeOnMongoS": 0,
+    "internalQueryMaxAddToSetBytes": 104857600,
+    "internalDocumentSourceSetWindowFieldsMaxMemoryBytes": 104857600,
+    "internalQueryFrameworkControl": "trySbeRestricted",
+    "internalQueryPlannerIgnoreIndexWithCollationForRegex": 1
+  },
+  "command": {
+    "find": "usuarios",
+    "filter": {
+      "estado": "AC"
+    },
+    "lsid": {
+      "id": "b'\\xe3\\xddVX7\\xfdF\\xa2\\x8aA\\xe7;2\\x02\\xa9\\x1b'"
+    },
+    "$clusterTime": {
+      "clusterTime": "Timestamp(1782008806, 1)",
+      "signature": {
+        "hash": "b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+        "keyId": 0
+      }
+    },
+    "$db": "bd2_experimentos"
+  },
+  "ok": 1.0,
+  "$clusterTime": {
+    "clusterTime": "Timestamp(1782008903, 1)",
+    "signature": {
+      "hash": "b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "keyId": 0
+    }
+  },
+  "operationTime": "Timestamp(1782008899, 4)"
+}

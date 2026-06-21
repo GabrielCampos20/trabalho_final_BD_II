@@ -1,0 +1,168 @@
+{
+    "explainVersion": "1",
+    "queryPlanner": {
+        "namespace": "bd2_experimentos.usuarios",
+        "parsedQuery": {
+            "$text": {
+                "$search": "Analista",
+                "$language": "english",
+                "$caseSensitive": false,
+                "$diacriticSensitive": false
+            }
+        },
+        "indexFilterSet": false,
+        "queryHash": "4FB85230",
+        "planCacheShapeHash": "4FB85230",
+        "planCacheKey": "F34F3876",
+        "optimizationTimeMillis": 0,
+        "maxIndexedOrSolutionsReached": false,
+        "maxIndexedAndSolutionsReached": false,
+        "maxScansToExplodeReached": false,
+        "prunedSimilarIndexes": false,
+        "winningPlan": {
+            "isCached": false,
+            "stage": "TEXT_MATCH",
+            "nss": "bd2_experimentos.usuarios",
+            "indexPrefix": {},
+            "indexName": "profissao_text",
+            "parsedTextQuery": {
+                "terms": [
+                    "analista"
+                ],
+                "negatedTerms": [],
+                "phrases": [],
+                "negatedPhrases": []
+            },
+            "textIndexVersion": 3,
+            "inputStage": {
+                "stage": "FETCH",
+                "nss": "bd2_experimentos.usuarios",
+                "inputStage": {
+                    "stage": "IXSCAN",
+                    "nss": "bd2_experimentos.usuarios",
+                    "keyPattern": {
+                        "_fts": "text",
+                        "_ftsx": 1
+                    },
+                    "indexName": "profissao_text",
+                    "isMultiKey": true,
+                    "isUnique": false,
+                    "isSparse": false,
+                    "isPartial": false,
+                    "indexVersion": 2,
+                    "direction": "backward",
+                    "indexBounds": {}
+                }
+            }
+        },
+        "rejectedPlans": []
+    },
+    "executionStats": {
+        "executionSuccess": true,
+        "nReturned": 0,
+        "executionTimeMillis": 0,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 0,
+        "executionStages": {
+            "isCached": false,
+            "stage": "TEXT_MATCH",
+            "nReturned": 0,
+            "executionTimeMillisEstimate": 0,
+            "works": 1,
+            "advanced": 0,
+            "needTime": 0,
+            "needYield": 0,
+            "saveState": 0,
+            "restoreState": 0,
+            "isEOF": 1,
+            "nss": "bd2_experimentos.usuarios",
+            "indexPrefix": {},
+            "indexName": "profissao_text",
+            "parsedTextQuery": {
+                "terms": [
+                    "analista"
+                ],
+                "negatedTerms": [],
+                "phrases": [],
+                "negatedPhrases": []
+            },
+            "textIndexVersion": 3,
+            "docsRejected": 0,
+            "inputStage": {
+                "stage": "FETCH",
+                "nReturned": 0,
+                "executionTimeMillisEstimate": 0,
+                "works": 1,
+                "advanced": 0,
+                "needTime": 0,
+                "needYield": 0,
+                "saveState": 0,
+                "restoreState": 0,
+                "isEOF": 1,
+                "nss": "bd2_experimentos.usuarios",
+                "docsExamined": 0,
+                "alreadyHasObj": 0,
+                "inputStage": {
+                    "stage": "IXSCAN",
+                    "nReturned": 0,
+                    "executionTimeMillisEstimate": 0,
+                    "works": 1,
+                    "advanced": 0,
+                    "needTime": 0,
+                    "needYield": 0,
+                    "saveState": 0,
+                    "restoreState": 0,
+                    "isEOF": 1,
+                    "nss": "bd2_experimentos.usuarios",
+                    "keyPattern": {
+                        "_fts": "text",
+                        "_ftsx": 1
+                    },
+                    "indexName": "profissao_text",
+                    "isMultiKey": true,
+                    "isUnique": false,
+                    "isSparse": false,
+                    "isPartial": false,
+                    "indexVersion": 2,
+                    "direction": "backward",
+                    "indexBounds": {},
+                    "keysExamined": 0,
+                    "seeks": 1,
+                    "dupsTested": 0,
+                    "dupsDropped": 0,
+                    "peakTrackedMemBytes": 0
+                }
+            }
+        },
+        "allPlansExecution": []
+    },
+    "queryShapeHash": "6B5C31095F8B971AF756F0BF7E6D939D6D9FE361F9B4B9FDEE0997636863071E",
+    "command": {
+        "find": "usuarios",
+        "filter": {
+            "$text": {
+                "$search": "Analista"
+            }
+        },
+        "$db": "bd2_experimentos"
+    },
+    "serverInfo": {
+        "host": "merlin",
+        "port": 27017,
+        "version": "8.3.2",
+        "gitVersion": "89f54eb32e217d2f7bfcad50e5919f3033bb9611"
+    },
+    "serverParameters": {
+        "internalQueryFacetBufferSizeBytes": 104857600,
+        "internalDocumentSourceGroupMaxMemoryBytes": 104857600,
+        "internalQueryMaxBlockingSortMemoryUsageBytes": 104857600,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes": 104857600,
+        "internalQueryFacetMaxOutputDocSizeBytes": 104857600,
+        "internalLookupStageIntermediateDocumentMaxSizeBytes": 104857600,
+        "internalQueryProhibitBlockingMergeOnMongoS": 0,
+        "internalQueryMaxAddToSetBytes": 104857600,
+        "internalQueryFrameworkControl": "trySbeRestricted",
+        "internalQueryPlannerIgnoreIndexWithCollationForRegex": 1
+    },
+    "ok": 1.0
+}

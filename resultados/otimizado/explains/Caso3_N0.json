@@ -1,0 +1,137 @@
+{
+    "explainVersion": "1",
+    "queryPlanner": {
+        "namespace": "bd2_experimentos.usuarios",
+        "parsedQuery": {
+            "$and": [
+                {
+                    "criado_em": {
+                        "$lte": "2015-12-31 00:00:00"
+                    }
+                },
+                {
+                    "criado_em": {
+                        "$gte": "2015-01-01 00:00:00"
+                    }
+                }
+            ]
+        },
+        "indexFilterSet": false,
+        "queryHash": "E4CBA0AE",
+        "planCacheShapeHash": "E4CBA0AE",
+        "planCacheKey": "49DB9114",
+        "optimizationTimeMillis": 0,
+        "maxIndexedOrSolutionsReached": false,
+        "maxIndexedAndSolutionsReached": false,
+        "maxScansToExplodeReached": false,
+        "prunedSimilarIndexes": false,
+        "winningPlan": {
+            "isCached": false,
+            "stage": "LIMIT",
+            "limitAmount": 5000,
+            "inputStage": {
+                "stage": "COLLSCAN",
+                "filter": {
+                    "$and": [
+                        {
+                            "criado_em": {
+                                "$lte": "2015-12-31 00:00:00"
+                            }
+                        },
+                        {
+                            "criado_em": {
+                                "$gte": "2015-01-01 00:00:00"
+                            }
+                        }
+                    ]
+                },
+                "nss": "bd2_experimentos.usuarios",
+                "direction": "forward"
+            }
+        },
+        "rejectedPlans": []
+    },
+    "executionStats": {
+        "executionSuccess": true,
+        "nReturned": 0,
+        "executionTimeMillis": 80432,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 80550000,
+        "executionStages": {
+            "isCached": false,
+            "stage": "LIMIT",
+            "nReturned": 0,
+            "executionTimeMillisEstimate": 78020,
+            "works": 80550001,
+            "advanced": 0,
+            "needTime": 80550000,
+            "needYield": 0,
+            "saveState": 4146,
+            "restoreState": 4146,
+            "isEOF": 1,
+            "limitAmount": 5000,
+            "inputStage": {
+                "stage": "COLLSCAN",
+                "filter": {
+                    "$and": [
+                        {
+                            "criado_em": {
+                                "$lte": "2015-12-31 00:00:00"
+                            }
+                        },
+                        {
+                            "criado_em": {
+                                "$gte": "2015-01-01 00:00:00"
+                            }
+                        }
+                    ]
+                },
+                "nReturned": 0,
+                "executionTimeMillisEstimate": 75374,
+                "works": 80550001,
+                "advanced": 0,
+                "needTime": 80550000,
+                "needYield": 0,
+                "saveState": 4146,
+                "restoreState": 4146,
+                "isEOF": 1,
+                "nss": "bd2_experimentos.usuarios",
+                "direction": "forward",
+                "docsExamined": 80550000
+            }
+        },
+        "allPlansExecution": []
+    },
+    "queryShapeHash": "B2A60339D933BFEC767952DF34D407216DA2F68731396AD740BB6C2945A85E69",
+    "command": {
+        "find": "usuarios",
+        "filter": {
+            "criado_em": {
+                "$gte": "2015-01-01 00:00:00",
+                "$lte": "2015-12-31 00:00:00"
+            }
+        },
+        "limit": 5000,
+        "singleBatch": true,
+        "$db": "bd2_experimentos"
+    },
+    "serverInfo": {
+        "host": "merlin",
+        "port": 27017,
+        "version": "8.3.2",
+        "gitVersion": "89f54eb32e217d2f7bfcad50e5919f3033bb9611"
+    },
+    "serverParameters": {
+        "internalQueryFacetBufferSizeBytes": 104857600,
+        "internalDocumentSourceGroupMaxMemoryBytes": 104857600,
+        "internalQueryMaxBlockingSortMemoryUsageBytes": 104857600,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes": 104857600,
+        "internalQueryFacetMaxOutputDocSizeBytes": 104857600,
+        "internalLookupStageIntermediateDocumentMaxSizeBytes": 104857600,
+        "internalQueryProhibitBlockingMergeOnMongoS": 0,
+        "internalQueryMaxAddToSetBytes": 104857600,
+        "internalQueryFrameworkControl": "trySbeRestricted",
+        "internalQueryPlannerIgnoreIndexWithCollationForRegex": 1
+    },
+    "ok": 1.0
+}

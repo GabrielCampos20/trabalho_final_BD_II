@@ -71,6 +71,18 @@ def main():
     print("  -> Limpando cache de build (docker builder prune)...")
     run_cmd("docker builder prune -a -f")
 
+    print("\n[5/5] Removendo relatórios e lixo antigo do disco local...")
+    import shutil
+    import os
+    for dir_name in ["resultados", "results"]:
+        target = os.path.join(PROJECT_ROOT, dir_name)
+        if os.path.exists(target):
+            try:
+                shutil.rmtree(target)
+                print(f"  -> '{dir_name}' deletada.")
+            except Exception as e:
+                print(f"  [Aviso] Nao foi possivel deletar '{dir_name}': {e}")
+                
     print("\n" + "=" * 50)
     print(" LIMPEZA CONCLUIDA! AMBIENTE 100% ESTERILIZADO. ")
     print("=" * 50)

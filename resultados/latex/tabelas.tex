@@ -1,0 +1,30 @@
+\begin{table}[htpb]
+\centering
+\caption{Comparativo de Desempenho e Documentos Examinados}
+\label{tab:resultados}
+\begin{tabular}{l|rr|rr|r}
+\hline
+\textbf{Caso de Uso} & \textbf{Tempo sem Índice (ms)} & \textbf{Docs. Examinados (Sem)} & \textbf{Tempo com Índice (ms)} & \textbf{Docs. Examinados (Com)} & \textbf{Fator de Aceleração (Speedup)} \\
+\hline
+Caso 1 Campo unico & 77572.76 & 80,550,000 & 537.05 & 2,984,773 & 144.44x \\
+Caso 2 Composto & 89332.10 & 80,550,000 & 289.31 & 1,495,122 & 308.78x \\
+Caso 3 Faixa numerica & 77543.30 & 80,550,000 & 737.03 & 4,552,476 & 105.21x \\
+Caso 4 Datas & 76072.65 & 80,550,000 & 2655.52 & 15,823,893 & 28.65x \\
+Caso 5 Textual & 94594.52 & 80,550,000 & 1.00 & 0 & 94500.02x \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[htpb]
+\centering
+\caption{Impacto dos Índices no Armazenamento e Inserção}
+\label{tab:impacto_indices}
+\begin{tabular}{l|rr}
+\hline
+\textbf{Cenário} & \textbf{Tamanho dos Índices (MB)} & \textbf{Tempo de Inserção (ms)} \\
+\hline
+Sem Índices & 868.45 & 78.33 \\
+Com Todos os Índices & 3996.06 & 554.32 \\
+\hline
+\end{tabular}
+\end{table}

@@ -31,6 +31,13 @@ def run_distribuido():
     except subprocess.CalledProcessError:
         print("\n[ERRO] A execução do caso distribuído falhou.")
 
+def run_otimizado():
+    print("\n[Iniciando] Estudo de Caso 3: Otimização Progressiva (N0 ao N4)...")
+    try:
+        subprocess.run([sys.executable, "-m", "src.experimentos.caso_otimizado"], check=True)
+    except subprocess.CalledProcessError:
+        print("\n[ERRO] A execução do caso otimizado falhou.")
+
 def limpar_ambiente():
     print("\n[Iniciando] Limpeza Profunda de Ambiente (Requer permissões sudo)...")
     try:
@@ -47,6 +54,7 @@ def main():
         print(" [ 2 ] Rodar Experimento Distribuído (Sharded Cluster)")
         print(" [ 3 ] Rodar Bateria Completa (Isolado -> Distribuído)")
         print(" [ 4 ] Limpar Ambiente (Destruir Containers e Bancos)")
+        print(" [ 5 ] Otimização Progressiva (Covered Queries)")
         print(" [ 0 ] Sair")
         print("="*60)
         
@@ -69,6 +77,10 @@ def main():
             
         elif escolha == '4':
             limpar_ambiente()
+            input("\nPressione ENTER para voltar ao menu...")
+            
+        elif escolha == '5':
+            run_otimizado()
             input("\nPressione ENTER para voltar ao menu...")
             
         elif escolha == '0':

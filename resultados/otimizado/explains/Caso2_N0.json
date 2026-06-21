@@ -1,0 +1,137 @@
+{
+    "explainVersion": "1",
+    "queryPlanner": {
+        "namespace": "bd2_experimentos.usuarios",
+        "parsedQuery": {
+            "$and": [
+                {
+                    "salario": {
+                        "$lte": 7630.92
+                    }
+                },
+                {
+                    "salario": {
+                        "$gte": 2620.99
+                    }
+                }
+            ]
+        },
+        "indexFilterSet": false,
+        "queryHash": "B7AAE404",
+        "planCacheShapeHash": "B7AAE404",
+        "planCacheKey": "2429853A",
+        "optimizationTimeMillis": 0,
+        "maxIndexedOrSolutionsReached": false,
+        "maxIndexedAndSolutionsReached": false,
+        "maxScansToExplodeReached": false,
+        "prunedSimilarIndexes": false,
+        "winningPlan": {
+            "isCached": false,
+            "stage": "LIMIT",
+            "limitAmount": 5000,
+            "inputStage": {
+                "stage": "COLLSCAN",
+                "filter": {
+                    "$and": [
+                        {
+                            "salario": {
+                                "$lte": 7630.92
+                            }
+                        },
+                        {
+                            "salario": {
+                                "$gte": 2620.99
+                            }
+                        }
+                    ]
+                },
+                "nss": "bd2_experimentos.usuarios",
+                "direction": "forward"
+            }
+        },
+        "rejectedPlans": []
+    },
+    "executionStats": {
+        "executionSuccess": true,
+        "nReturned": 5000,
+        "executionTimeMillis": 16,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 24041,
+        "executionStages": {
+            "isCached": false,
+            "stage": "LIMIT",
+            "nReturned": 5000,
+            "executionTimeMillisEstimate": 5,
+            "works": 24042,
+            "advanced": 5000,
+            "needTime": 19041,
+            "needYield": 0,
+            "saveState": 0,
+            "restoreState": 0,
+            "isEOF": 1,
+            "limitAmount": 5000,
+            "inputStage": {
+                "stage": "COLLSCAN",
+                "filter": {
+                    "$and": [
+                        {
+                            "salario": {
+                                "$lte": 7630.92
+                            }
+                        },
+                        {
+                            "salario": {
+                                "$gte": 2620.99
+                            }
+                        }
+                    ]
+                },
+                "nReturned": 5000,
+                "executionTimeMillisEstimate": 5,
+                "works": 24041,
+                "advanced": 5000,
+                "needTime": 19041,
+                "needYield": 0,
+                "saveState": 0,
+                "restoreState": 0,
+                "isEOF": 0,
+                "nss": "bd2_experimentos.usuarios",
+                "direction": "forward",
+                "docsExamined": 24041
+            }
+        },
+        "allPlansExecution": []
+    },
+    "queryShapeHash": "828E22563CD2239416FBD09C0F62AEF447777D870932FE32D81BCCD59D682283",
+    "command": {
+        "find": "usuarios",
+        "filter": {
+            "salario": {
+                "$gte": 2620.99,
+                "$lte": 7630.92
+            }
+        },
+        "limit": 5000,
+        "singleBatch": true,
+        "$db": "bd2_experimentos"
+    },
+    "serverInfo": {
+        "host": "merlin",
+        "port": 27017,
+        "version": "8.3.2",
+        "gitVersion": "89f54eb32e217d2f7bfcad50e5919f3033bb9611"
+    },
+    "serverParameters": {
+        "internalQueryFacetBufferSizeBytes": 104857600,
+        "internalDocumentSourceGroupMaxMemoryBytes": 104857600,
+        "internalQueryMaxBlockingSortMemoryUsageBytes": 104857600,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes": 104857600,
+        "internalQueryFacetMaxOutputDocSizeBytes": 104857600,
+        "internalLookupStageIntermediateDocumentMaxSizeBytes": 104857600,
+        "internalQueryProhibitBlockingMergeOnMongoS": 0,
+        "internalQueryMaxAddToSetBytes": 104857600,
+        "internalQueryFrameworkControl": "trySbeRestricted",
+        "internalQueryPlannerIgnoreIndexWithCollationForRegex": 1
+    },
+    "ok": 1.0
+}

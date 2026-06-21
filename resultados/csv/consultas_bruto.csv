@@ -1,0 +1,101 @@
+Caso de Uso,Cenario,Repeticao,Tempo (ms)
+Caso 1 Campo unico,Sem Indice,1,68664.185
+Caso 1 Campo unico,Sem Indice,2,68463.9
+Caso 1 Campo unico,Sem Indice,3,68391.631
+Caso 1 Campo unico,Sem Indice,4,68300.784
+Caso 1 Campo unico,Sem Indice,5,79158.566
+Caso 1 Campo unico,Sem Indice,6,82748.797
+Caso 1 Campo unico,Sem Indice,7,88525.773
+Caso 1 Campo unico,Sem Indice,8,78590.601
+Caso 1 Campo unico,Sem Indice,9,82838.328
+Caso 1 Campo unico,Sem Indice,10,90045.074
+Caso 1 Campo unico,Com Indice,1,578.608
+Caso 1 Campo unico,Com Indice,2,537.872
+Caso 1 Campo unico,Com Indice,3,565.001
+Caso 1 Campo unico,Com Indice,4,532.674
+Caso 1 Campo unico,Com Indice,5,537.619
+Caso 1 Campo unico,Com Indice,6,541.15
+Caso 1 Campo unico,Com Indice,7,528.581
+Caso 1 Campo unico,Com Indice,8,511.375
+Caso 1 Campo unico,Com Indice,9,521.424
+Caso 1 Campo unico,Com Indice,10,516.163
+Caso 2 Composto,Sem Indice,1,95972.694
+Caso 2 Composto,Sem Indice,2,87757.771
+Caso 2 Composto,Sem Indice,3,93441.243
+Caso 2 Composto,Sem Indice,4,104779.947
+Caso 2 Composto,Sem Indice,5,89814.917
+Caso 2 Composto,Sem Indice,6,92554.304
+Caso 2 Composto,Sem Indice,7,82872.748
+Caso 2 Composto,Sem Indice,8,81812.894
+Caso 2 Composto,Sem Indice,9,82230.435
+Caso 2 Composto,Sem Indice,10,82084.009
+Caso 2 Composto,Com Indice,1,306.455
+Caso 2 Composto,Com Indice,2,302.733
+Caso 2 Composto,Com Indice,3,302.323
+Caso 2 Composto,Com Indice,4,303.661
+Caso 2 Composto,Com Indice,5,284.63
+Caso 2 Composto,Com Indice,6,302.711
+Caso 2 Composto,Com Indice,7,281.453
+Caso 2 Composto,Com Indice,8,269.553
+Caso 2 Composto,Com Indice,9,274.666
+Caso 2 Composto,Com Indice,10,264.919
+Caso 3 Faixa numerica,Sem Indice,1,77575.047
+Caso 3 Faixa numerica,Sem Indice,2,77534.125
+Caso 3 Faixa numerica,Sem Indice,3,77505.449
+Caso 3 Faixa numerica,Sem Indice,4,77504.384
+Caso 3 Faixa numerica,Sem Indice,5,77865.664
+Caso 3 Faixa numerica,Sem Indice,6,77466.24
+Caso 3 Faixa numerica,Sem Indice,7,77615.113
+Caso 3 Faixa numerica,Sem Indice,8,77358.641
+Caso 3 Faixa numerica,Sem Indice,9,77480.336
+Caso 3 Faixa numerica,Sem Indice,10,77527.965
+Caso 3 Faixa numerica,Com Indice,1,792.047
+Caso 3 Faixa numerica,Com Indice,2,733.379
+Caso 3 Faixa numerica,Com Indice,3,746.708
+Caso 3 Faixa numerica,Com Indice,4,743.563
+Caso 3 Faixa numerica,Com Indice,5,729.865
+Caso 3 Faixa numerica,Com Indice,6,730.916
+Caso 3 Faixa numerica,Com Indice,7,719.389
+Caso 3 Faixa numerica,Com Indice,8,723.406
+Caso 3 Faixa numerica,Com Indice,9,725.378
+Caso 3 Faixa numerica,Com Indice,10,725.657
+Caso 4 Datas,Sem Indice,1,76159.323
+Caso 4 Datas,Sem Indice,2,75615.65
+Caso 4 Datas,Sem Indice,3,75658.523
+Caso 4 Datas,Sem Indice,4,76007.054
+Caso 4 Datas,Sem Indice,5,76003.624
+Caso 4 Datas,Sem Indice,6,75502.879
+Caso 4 Datas,Sem Indice,7,75705.879
+Caso 4 Datas,Sem Indice,8,75812.818
+Caso 4 Datas,Sem Indice,9,76318.405
+Caso 4 Datas,Sem Indice,10,77942.316
+Caso 4 Datas,Com Indice,1,2699.302
+Caso 4 Datas,Com Indice,2,2684.052
+Caso 4 Datas,Com Indice,3,2584.687
+Caso 4 Datas,Com Indice,4,2627.793
+Caso 4 Datas,Com Indice,5,2683.447
+Caso 4 Datas,Com Indice,6,2662.72
+Caso 4 Datas,Com Indice,7,2609.536
+Caso 4 Datas,Com Indice,8,2632.121
+Caso 4 Datas,Com Indice,9,2706.859
+Caso 4 Datas,Com Indice,10,2664.667
+Caso 5 Textual,Sem Indice,1,96149.891
+Caso 5 Textual,Sem Indice,2,94645.282
+Caso 5 Textual,Sem Indice,3,94521.824
+Caso 5 Textual,Sem Indice,4,94205.718
+Caso 5 Textual,Sem Indice,5,94822.943
+Caso 5 Textual,Sem Indice,6,94290.61
+Caso 5 Textual,Sem Indice,7,94390.673
+Caso 5 Textual,Sem Indice,8,94466.083
+Caso 5 Textual,Sem Indice,9,94137.185
+Caso 5 Textual,Sem Indice,10,94315.016
+Caso 5 Textual,Com Indice,1,1.251
+Caso 5 Textual,Com Indice,2,1.167
+Caso 5 Textual,Com Indice,3,0.941
+Caso 5 Textual,Com Indice,4,0.858
+Caso 5 Textual,Com Indice,5,0.834
+Caso 5 Textual,Com Indice,6,0.904
+Caso 5 Textual,Com Indice,7,0.83
+Caso 5 Textual,Com Indice,8,0.884
+Caso 5 Textual,Com Indice,9,1.233
+Caso 5 Textual,Com Indice,10,1.104
