@@ -5,7 +5,7 @@
     "collection": "usuarios"
   },
   "dataset": {
-    "tamanho_gb": 30.0,
+    "tamanho_gb": 0.1,
     "locale": "pt_BR",
     "batch_size": 50000
   },

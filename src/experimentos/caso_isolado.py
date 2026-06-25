@@ -476,7 +476,7 @@ def exportar_csv(resultados):
                     tam_com = dados["tamanho_index_com_mb"]
                     writer.writerow(["Sem Indices", round(tam_sem, 2), t_sem])
                     writer.writerow(["Com Todos os Indices", round(tam_com, 2), t_com])
-        print(f"  -> {caminho_escrita}")
+        print(f"  -> {arquivo_escrita}")
 
 
 def gerar_todos_graficos(resultados):
